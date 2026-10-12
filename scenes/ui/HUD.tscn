@@ -1,0 +1,148 @@
+[gd_scene load_steps=3 format=3 uid="uid://bhud001"]
+
+[ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scripts/ui/WormSwatch.gd" id="2_swatch"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 25
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Safe" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopBar" type="HBoxContainer" parent="Root/Safe"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 56.0
+grow_horizontal = 2
+theme_override_constants/separation = 10
+
+[node name="ScoreChip" type="PanelContainer" parent="Root/Safe/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Margin" type="MarginContainer" parent="Root/Safe/TopBar/ScoreChip"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 8
+
+[node name="Score" type="Label" parent="Root/Safe/TopBar/ScoreChip/Margin"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="LivesChip" type="PanelContainer" parent="Root/Safe/TopBar"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Root/Safe/TopBar/LivesChip"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="Lives" type="Label" parent="Root/Safe/TopBar/LivesChip/Margin"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "♥♥♥"
+
+[node name="PauseButton" type="Button" parent="Root/Safe/TopBar"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+text = "Ⅱ"
+
+[node name="LevelLabel" type="Label" parent="Root/Safe"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 60.0
+offset_bottom = 84.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 14
+text = ""
+horizontal_alignment = 1
+
+[node name="ComboLabel" type="Label" parent="Root/Safe"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 88.0
+offset_bottom = 118.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="Root/Safe"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+offset_bottom = -72.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 14
+text = ""
+horizontal_alignment = 1
+
+[node name="BottomBar" type="HBoxContainer" parent="Root/Safe"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -90.0
+offset_top = -64.0
+offset_right = 90.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+
+[node name="NextChip" type="PanelContainer" parent="Root/Safe/BottomBar"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Root/Safe/BottomBar/NextChip"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 8
+
+[node name="Row" type="HBoxContainer" parent="Root/Safe/BottomBar/NextChip/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NextLabel" type="Label" parent="Root/Safe/BottomBar/NextChip/Margin/Row"]
+layout_mode = 2
+text = "NEXT"
+vertical_alignment = 1
+
+[node name="WormSwatch" type="Control" parent="Root/Safe/BottomBar/NextChip/Margin/Row"]
+custom_minimum_size = Vector2(52, 36)
+layout_mode = 2
+script = ExtResource("2_swatch")

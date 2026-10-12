@@ -1,0 +1,30 @@
+[gd_scene load_steps=8 format=3 uid="uid://bmaincluck001"]
+
+[ext_resource type="Script" path="res://scripts/main/Main.gd" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://bmainmenu001" path="res://scenes/ui/MainMenuUI.tscn" id="2_menu"]
+[ext_resource type="PackedScene" uid="uid://bhud001" path="res://scenes/ui/HUD.tscn" id="3_hud"]
+[ext_resource type="PackedScene" uid="uid://bpauseui001" path="res://scenes/ui/PauseUI.tscn" id="4_pause"]
+[ext_resource type="PackedScene" uid="uid://blevelcomplete001" path="res://scenes/ui/LevelCompleteUI.tscn" id="5_lc"]
+[ext_resource type="PackedScene" uid="uid://bstagecomplete001" path="res://scenes/ui/StageCompleteUI.tscn" id="6_sc"]
+[ext_resource type="PackedScene" uid="uid://bgameover001" path="res://scenes/ui/GameOverUI.tscn" id="7_go"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="LevelHost" type="Node" parent="."]
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 40
+process_mode = 3
+
+[node name="MainMenuUI" parent="UI" instance=ExtResource("2_menu")]
+
+[node name="PauseUI" parent="UI" instance=ExtResource("4_pause")]
+
+[node name="LevelCompleteUI" parent="UI" instance=ExtResource("5_lc")]
+
+[node name="StageCompleteUI" parent="UI" instance=ExtResource("6_sc")]
+
+[node name="GameOverUI" parent="UI" instance=ExtResource("7_go")]

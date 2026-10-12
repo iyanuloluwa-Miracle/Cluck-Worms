@@ -1,0 +1,116 @@
+[gd_scene load_steps=3 format=3 uid="uid://bmainmenu001"]
+
+[ext_resource type="Script" path="res://scripts/ui/MainMenuUI.gd" id="1_menu"]
+[ext_resource type="Script" path="res://scripts/ui/ChickenMascot.gd" id="2_mascot"]
+
+[node name="MainMenuUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.12, 0.28, 0.18, 1)
+
+[node name="GradientTop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 220.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.16, 0.36, 0.22, 0.55)
+
+[node name="Vignette" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.06, 0.03, 0.3)
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 32
+
+[node name="Content" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Mascot" type="Control" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(180, 180)
+layout_mode = 2
+size_flags_horizontal = 4
+script = ExtResource("2_mascot")
+
+[node name="Title" type="Label" parent="SafeArea/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "Cluck & Worms"
+horizontal_alignment = 1
+
+[node name="Tagline" type="Label" parent="SafeArea/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Feed the frenzy. Match the worms."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Spacer" type="Control" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="HighScoreChip" type="PanelContainer" parent="SafeArea/Content"]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="Margin" type="MarginContainer" parent="SafeArea/Content/HighScoreChip"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="HighScore" type="Label" parent="SafeArea/Content/HighScoreChip/Margin"]
+layout_mode = 2
+text = "★  High Score  0"
+horizontal_alignment = 1
+
+[node name="Spacer2" type="Control" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="PlayButton" type="Button" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(260, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Play"
+
+[node name="QuitButton" type="Button" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(260, 52)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Quit"
