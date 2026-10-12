@@ -1,0 +1,68 @@
+[gd_scene load_steps=6 format=3 uid="uid://blevelcluck001"]
+
+[ext_resource type="Script" path="res://scripts/level/Level.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/chain/WormChain.gd" id="2_chain"]
+[ext_resource type="PackedScene" uid="uid://bwormcluck001" path="res://scenes/worm/Worm.tscn" id="3_worm"]
+[ext_resource type="Script" path="res://scripts/level/PathGuide.gd" id="4_guide"]
+[ext_resource type="PackedScene" uid="uid://bchicken001" path="res://scenes/chicken/Chicken.tscn" id="5_chicken"]
+
+[sub_resource type="Curve2D" id="Curve2D_serpentine"]
+resource_local_to_scene = true
+_data = {
+"points": PackedVector2Array(-40, 0, 80, -40, 70, 380, -60, 40, 70, -50, 260, 160, -80, 30, 80, 40, 480, 520, -70, -40, 80, -30, 720, 140, -80, 20, 70, 50, 960, 460, -60, -30, 40, 0, 1200, 300)
+}
+point_count = 6
+
+[node name="Level" type="Node2D"]
+script = ExtResource("1_level")
+level_id = &"level_01"
+initial_worm_count = 10
+
+[node name="Background" type="CanvasLayer" parent="."]
+layer = -10
+
+[node name="ColorRect" type="ColorRect" parent="Background"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.12, 0.28, 0.16, 1)
+
+[node name="GradientOverlay" type="ColorRect" parent="Background"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.12, 0.08, 0.35)
+
+[node name="PathGuide" type="Node2D" parent="."]
+script = ExtResource("4_guide")
+path = NodePath("../WormPath")
+guide_color = Color(1, 1, 1, 0.2)
+guide_width = 5.0
+danger_zone_length = 140.0
+
+[node name="WormPath" type="Path2D" parent="."]
+curve = SubResource("Curve2D_serpentine")
+
+[node name="WormChain" type="Node2D" parent="."]
+script = ExtResource("2_chain")
+worm_scene = ExtResource("3_worm")
+path = NodePath("../WormPath")
+worm_spacing = 40.0
+march_speed = 55.0
+is_marching = true
+spawn_interval = 0.72
+auto_spawn = true
+max_worms = 100
+
+[node name="Projectiles" type="Node2D" parent="."]
+
+[node name="Chicken" parent="." instance=ExtResource("5_chicken")]
+position = Vector2(640, 380)
+chain_path = NodePath("../WormChain")
+projectile_container_path = NodePath("../Projectiles")
