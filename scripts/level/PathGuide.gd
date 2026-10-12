@@ -15,6 +15,7 @@ extends Node2D
 func _ready() -> void:
 	if path == null:
 		path = get_parent().get_node_or_null("WormPath") as Path2D
+	sample_step = QualitySettings.path_sample_step
 	queue_redraw()
 
 
@@ -31,16 +32,19 @@ func _draw() -> void:
 	var danger_start: float = maxf(length - danger_zone_length, 0.0)
 	_draw_path_segment(curve, danger_start, length, danger_zone_color, guide_width + 6.0)
 
-	# Dashed guide for the full path.
-	var d: float = 0.0
-	var drawing: bool = true
-	while d < length:
-		var seg: float = dash_length if drawing else gap_length
-		var d1: float = minf(d + seg, length)
-		if drawing:
-			_draw_path_segment(curve, d, d1, guide_color, guide_width)
-		d = d1
-		drawing = not drawing
+	# Full path: solid stroke on low quality, dashed otherwise.
+	if QualitySettings.is_low():
+		_draw_path_segment(curve, 0.0, length, guide_color, guide_width)
+	else:
+		var d: float = 0.0
+		var drawing: bool = true
+		while d < length:
+			var seg: float = dash_length if drawing else gap_length
+			var d1: float = minf(d + seg, length)
+			if drawing:
+				_draw_path_segment(curve, d, d1, guide_color, guide_width)
+			d = d1
+			drawing = not drawing
 
 	# Start / end markers (convert path-local samples into this node's space).
 	var start_xf: Transform2D = curve.sample_baked_with_rotation(0.0, false)

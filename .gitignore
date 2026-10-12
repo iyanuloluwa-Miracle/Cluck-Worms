@@ -1,12 +1,20 @@
 # Godot 4+
 .godot/
 *.translation
-export.cfg
-export_presets.cfg
 
-# Imported assets cache is inside .godot/
-# OS / editor
+# Local editor / OS
 .DS_Store
 Thumbs.db
 *.tmp
 *~
+.import/
+
+# Build outputs (keep export_presets.cfg tracked)
+builds/
+*.pck
+*.zip
+
+# Secrets (if you add signed desktop/mobile presets later)
+# Keep export_presets.cfg in git — Web preset has no secrets.
+*.keystore
+*.jks

@@ -46,8 +46,8 @@ signal stage_completed(stage_id: StringName, stage_index: int, score: int)
 signal game_over(final_score: int, high_score: int, is_new_high: bool)
 signal life_lost(lives_remaining: int)
 
-## Main / flow controller should load this scene path and apply LevelDef.
-signal load_level_requested(level_def: LevelDef)
+## Main / flow controller should load this scene path and apply LevelData.
+signal load_level_requested(level_def: LevelData)
 signal unload_level_requested()
 
 # ---------------------------------------------------------------------------
@@ -58,3 +58,8 @@ signal chicken_shot(color: WormColor.Kind, origin: Vector2, direction: Vector2)
 signal chicken_swapped(current_color: WormColor.Kind, next_color: WormColor.Kind)
 signal chicken_loadout_changed(current_color: WormColor.Kind, next_color: WormColor.Kind)
 signal projectile_hit_chain(projectile: ShootingWorm, hit_worm: Worm, chain: WormChain)
+
+## Juice / feedback
+signal good_shot(world_pos: Vector2, match_count: int)
+signal near_miss(world_pos: Vector2)
+signal chicken_react(reaction: StringName, world_pos: Vector2)

@@ -26,7 +26,10 @@ extends Area2D
 @export var trail_sample_interval: float = 0.012
 
 ## Trail width at the head.
-@export var trail_width: float = 14.0
+@export var trail_width: float = 18.0
+
+## Distance band for near-miss feedback (outside hit, inside this).
+@export var near_miss_radius: float = 42.0
 
 # ---------------------------------------------------------------------------
 # State
@@ -42,6 +45,11 @@ var _trail_timer: float = 0.0
 var _trail_points: PackedVector2Array = PackedVector2Array()
 var _chain: WormChain = null
 var _owner_chicken: Chicken = null
+var _closest_same_color: float = INF
+var _closest_same_pos: Vector2 = Vector2.ZERO
+var _did_hit: bool = false
+var _near_miss_emitted: bool = false
+var _ghost_positions: Array[Vector2] = []
 
 @onready var _trail: Line2D = $Trail
 
@@ -70,23 +78,41 @@ func _physics_process(delta: float) -> void:
 
 	_lifetime += delta
 	if _lifetime >= max_lifetime:
-		_despawn()
+		_finish_flight(false)
 		return
 
 	_prev_global = global_position
 	global_position += direction * speed * delta
 	rotation = direction.angle()
 
+	_ghost_positions.insert(0, global_position)
+	while _ghost_positions.size() > 4:
+		_ghost_positions.remove_at(_ghost_positions.size() - 1)
+
 	_update_trail(delta)
+	_scan_near_misses()
 	_test_chain_collision()
-	queue_redraw()
+
+	# Off-screen miss (playfield + margin).
+	if global_position.x < -80.0 or global_position.x > 1360.0 \
+		or global_position.y < -80.0 or global_position.y > 800.0:
+		_finish_flight(false)
+		return
+	# Ghosts only need a redraw when we sample motion; trail is Line2D.
+	if not QualitySettings.is_low() or Engine.get_physics_frames() % 2 == 0:
+		queue_redraw()
 
 
 func _draw() -> void:
-	# Local-space worm silhouette traveling nose-first (+X).
 	var fill: Color = WormColor.get_fill(worm_color)
 	var outline: Color = WormColor.get_outline(worm_color)
 	var highlight: Color = WormColor.get_highlight(worm_color)
+
+	# Motion-blur ghosts in local space (behind the head).
+	for i: int in range(1, _ghost_positions.size()):
+		var alpha: float = 0.22 / float(i)
+		var offset: Vector2 = to_local(_ghost_positions[i])
+		draw_circle(offset + Vector2(6.0, 0.0), 8.0, Color(fill.r, fill.g, fill.b, alpha))
 
 	draw_circle(Vector2(-10.0, 0.0), 7.0, outline)
 	draw_circle(Vector2(8.0, 0.0), 11.0, outline)
@@ -130,9 +156,14 @@ func launch(
 	_chain = chain
 	_owner_chicken = chicken
 	is_alive = true
+	_did_hit = false
+	_near_miss_emitted = false
 	_lifetime = 0.0
+	_closest_same_color = INF
+	_ghost_positions.clear()
 	rotation = direction.angle()
 	_trail_points.clear()
+	trail_point_count = QualitySettings.trail_points
 	_apply_trail_gradient()
 	queue_redraw()
 
@@ -175,6 +206,7 @@ func _test_chain_collision() -> void:
 	if hit_worm == null:
 		return
 
+	_did_hit = true
 	_on_hit(hit_worm, hit_point)
 
 
@@ -212,8 +244,39 @@ func _on_hit(hit_worm: Worm, hit_point: Vector2) -> void:
 	_despawn()
 
 
+func _scan_near_misses() -> void:
+	if _chain == null or not is_instance_valid(_chain) or _near_miss_emitted or _did_hit:
+		return
+	for worm: Worm in _chain.get_worms():
+		if not is_instance_valid(worm) or not worm.is_active_in_chain():
+			continue
+		if worm.worm_color != worm_color:
+			continue
+		var d: float = global_position.distance_to(worm.global_position)
+		if d < _closest_same_color:
+			_closest_same_color = d
+			_closest_same_pos = worm.global_position
+		elif _closest_same_color < near_miss_radius and _closest_same_color > hit_radius \
+			and d > _closest_same_color + 10.0:
+			# Past closest approach without connecting — near miss.
+			_near_miss_emitted = true
+			EventBus.near_miss.emit(_closest_same_pos)
+			return
+
+
+func _finish_flight(hit: bool) -> void:
+	if not is_alive and hit:
+		return
+	if not _did_hit and not hit and not _near_miss_emitted:
+		if _closest_same_color < near_miss_radius and _closest_same_color > hit_radius:
+			EventBus.near_miss.emit(_closest_same_pos)
+	_despawn()
+
+
 func _despawn() -> void:
 	is_alive = false
+	if is_instance_valid(_trail):
+		_trail.clear_points()
 	queue_free()
 
 
@@ -247,10 +310,19 @@ func _apply_trail_gradient() -> void:
 	var fill: Color = WormColor.get_fill(worm_color)
 	var gradient := Gradient.new()
 	gradient.colors = PackedColorArray([
-		Color(fill.r, fill.g, fill.b, 0.55),
+		Color(fill.r, fill.g, fill.b, 0.75),
+		Color(fill.r, fill.g, fill.b, 0.35),
 		Color(fill.r, fill.g, fill.b, 0.0),
 	])
-	gradient.offsets = PackedFloat32Array([0.0, 1.0])
+	gradient.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
 	_trail.gradient = gradient
-	_trail.modulate = Color(1.0, 1.0, 1.0, 0.85)
+	_trail.modulate = Color(1.0, 1.0, 1.0, 0.95)
 	_trail.width = trail_width
+	_trail.width_curve = _make_width_curve()
+
+
+func _make_width_curve() -> Curve:
+	var c := Curve.new()
+	c.add_point(Vector2(0.0, 1.0))
+	c.add_point(Vector2(1.0, 0.15))
+	return c

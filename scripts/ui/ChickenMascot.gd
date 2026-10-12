@@ -8,6 +8,7 @@ var _time: float = 0.0
 var _blink: float = 2.5
 var _blinking: bool = false
 var _blink_left: float = 0.0
+var _redraw_accum: float = 0.0
 
 
 func _ready() -> void:
@@ -26,7 +27,14 @@ func _process(delta: float) -> void:
 		if _blink_left <= 0.0:
 			_blinking = false
 			_blink = randf_range(2.0, 5.0)
-	queue_redraw()
+	var interval: float = QualitySettings.chicken_redraw_interval
+	if interval <= 0.0:
+		queue_redraw()
+		return
+	_redraw_accum += delta
+	if _redraw_accum >= interval:
+		_redraw_accum = 0.0
+		queue_redraw()
 
 
 func _draw() -> void:

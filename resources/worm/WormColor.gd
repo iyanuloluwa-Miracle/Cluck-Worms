@@ -57,8 +57,9 @@ static func get_highlight(kind: Kind) -> Color:
 	return HIGHLIGHT_PALETTE[kind]
 
 
-static func random_kind(rng: RandomNumberGenerator) -> Kind:
-	return rng.randi_range(0, KIND_COUNT - 1) as Kind
+static func random_kind(rng: RandomNumberGenerator, color_count: int = KIND_COUNT) -> Kind:
+	var count: int = clampi(color_count, 1, KIND_COUNT)
+	return rng.randi_range(0, count - 1) as Kind
 
 
 static func kind_name(kind: Kind) -> String:

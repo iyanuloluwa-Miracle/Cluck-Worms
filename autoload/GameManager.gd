@@ -50,7 +50,9 @@ var is_paused: bool = false
 var catalog: ProgressionCatalog
 var stage_index: int = 0
 var level_index: int = 0
-var current_level_def: LevelDef = null
+var current_level_def: LevelData = null
+## Active color pool size for the loaded level (3–6).
+var active_color_count: int = WormColor.KIND_COUNT
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _state_before_pause: State = State.PLAYING
@@ -103,7 +105,11 @@ func get_rng() -> RandomNumberGenerator:
 
 
 func roll_worm_color() -> WormColor.Kind:
-	return WormColor.random_kind(_rng)
+	return WormColor.random_kind(_rng, active_color_count)
+
+
+func get_active_color_count() -> int:
+	return active_color_count
 
 
 func state_name(s: State = state) -> String:
@@ -282,12 +288,13 @@ func _load_current_level() -> void:
 		push_error("GameManager: invalid stage_index %d" % stage_index)
 		go_to_main_menu()
 		return
-	var level_def: LevelDef = stage.get_level(level_index)
+	var level_def: LevelData = stage.get_level(level_index)
 	if level_def == null:
 		push_error("GameManager: invalid level_index %d" % level_index)
 		go_to_main_menu()
 		return
 	current_level_def = level_def
+	active_color_count = clampi(level_def.color_count, 3, WormColor.KIND_COUNT)
 	_set_tree_paused(false)
 	is_paused = false
 	_change_state(State.PLAYING)

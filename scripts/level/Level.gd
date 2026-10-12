@@ -1,7 +1,6 @@
 class_name Level
 extends Node2D
-## Playable level instance. Owns path, chain, and chicken.
-## Progression / score / lives are owned by GameManager via EventBus.
+## Playable level instance. Configured entirely from [LevelData] before play.
 
 @export var level_id: StringName = &"level_01"
 @export var path_node: Path2D
@@ -10,8 +9,14 @@ extends Node2D
 @export var initial_worm_count: int = 8
 @export var show_path_guide: bool = true
 
+var _level_data: LevelData = null
+var _configured: bool = false
+
 @onready var _path_draw: Node2D = $PathGuide
 @onready var _projectiles: Node2D = $Projectiles
+@onready var _bg_rect: ColorRect = $Background/ColorRect
+@onready var _fx: Node2D = $FX
+@onready var _camera: Camera2D = $LevelCamera
 
 
 func _ready() -> void:
@@ -21,6 +26,10 @@ func _ready() -> void:
 		chain_node = $WormChain as WormChain
 	if chicken_node == null:
 		chicken_node = $Chicken as Chicken
+
+	# If Main already called apply_level_data before add_child, path/tuning exist.
+	if not _configured and _level_data != null:
+		_apply_data_internal(_level_data)
 
 	chain_node.path = path_node
 	chain_node.rebuild_path_cache()
@@ -33,8 +42,12 @@ func _ready() -> void:
 	chain_node.auto_spawn = false
 	chain_node.is_marching = false
 	_seed_initial_chain()
+	if _level_data != null:
+		chain_node.configure_spawn_budget(_level_data.get_remaining_spawns_after_initial())
+		chain_node.auto_spawn = _level_data.auto_spawn and chain_node.spawns_remaining != 0
+	else:
+		chain_node.auto_spawn = was_auto
 	chain_node.is_marching = true
-	chain_node.auto_spawn = was_auto
 
 	EventBus.chain_reached_end.connect(_on_reached_end)
 	EventBus.chain_cleared.connect(_on_cleared)
@@ -44,18 +57,66 @@ func _ready() -> void:
 		_path_draw.queue_redraw()
 
 	chicken_node.set_shooting_enabled(GameManager.can_player_act())
+	JuiceDirector.bind_camera(_camera)
+	# Keep FX host warm so first pop isn't delayed.
+	if _fx:
+		_fx.z_index = 20
 
 
-## Called by Main after instantiate so catalog tunables apply.
-func apply_progression_tuning(level_def: LevelDef) -> void:
-	if chain_node == null:
-		chain_node = $WormChain as WormChain
-	if chain_node == null or level_def == null:
+## Preferred entry: call on the instance BEFORE add_child so _ready seeds correctly.
+func apply_level_data(data: LevelData) -> void:
+	_level_data = data
+	_apply_data_internal(data)
+	_configured = true
+
+
+## Back-compat name used by Main.
+func apply_progression_tuning(level_def: LevelData) -> void:
+	apply_level_data(level_def)
+	# If already in tree, refresh curve cache + guide after late apply.
+	if is_inside_tree() and path_node and chain_node:
+		chain_node.path = path_node
+		chain_node.rebuild_path_cache()
+		if _path_draw:
+			if _path_draw.has_method("queue_redraw"):
+				_path_draw.queue_redraw()
+
+
+func _apply_data_internal(data: LevelData) -> void:
+	if data == null:
 		return
-	chain_node.march_speed = level_def.march_speed
-	chain_node.spawn_interval = level_def.spawn_interval
-	chain_node.auto_spawn = level_def.auto_spawn
-	chain_node.worm_spacing = level_def.worm_spacing
+	level_id = data.id
+	initial_worm_count = data.initial_worm_count
+
+	if path_node == null:
+		path_node = get_node_or_null("WormPath") as Path2D
+	if chain_node == null:
+		chain_node = get_node_or_null("WormChain") as WormChain
+	if chicken_node == null:
+		chicken_node = get_node_or_null("Chicken") as Chicken
+
+	if path_node:
+		path_node.curve = data.build_curve()
+
+	if chain_node:
+		chain_node.march_speed = data.march_speed
+		chain_node.spawn_interval = data.spawn_interval
+		chain_node.auto_spawn = data.auto_spawn
+		chain_node.worm_spacing = data.worm_spacing
+
+	if chicken_node:
+		chicken_node.position = data.chicken_position
+
+	var bg: ColorRect = get_node_or_null("Background/ColorRect") as ColorRect
+	if bg:
+		bg.color = data.background_color
+
+	var guide: Node = get_node_or_null("PathGuide")
+	if guide and "danger_zone_length" in guide:
+		guide.set("danger_zone_length", data.danger_zone_length)
+		guide.set("path", path_node)
+		if "sample_step" in guide:
+			guide.set("sample_step", QualitySettings.path_sample_step)
 
 
 func _seed_initial_chain() -> void:
@@ -65,6 +126,10 @@ func _seed_initial_chain() -> void:
 	if worms.is_empty():
 		return
 	var lead_offset: float = float(initial_worm_count) * chain_node.worm_spacing
+	# Keep the train on the path — clamp so leader isn't past the midpoint.
+	var path_len: float = chain_node.get_path_length()
+	if path_len > 0.0:
+		lead_offset = minf(lead_offset, path_len * 0.35)
 	for worm: Worm in worms:
 		worm.path_distance += lead_offset
 		worm.target_path_distance += lead_offset

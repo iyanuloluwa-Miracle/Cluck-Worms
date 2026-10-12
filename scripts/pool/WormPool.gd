@@ -36,7 +36,6 @@ func warm(count: int) -> void:
 func acquire() -> Worm:
 	if _available.is_empty():
 		if _total_count() >= max_size:
-			push_warning("WormPool: exhausted (max_size=%d)." % max_size)
 			return null
 		warm(maxi(8, initial_size / 4))
 	if _available.is_empty():

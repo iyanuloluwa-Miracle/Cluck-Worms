@@ -96,6 +96,13 @@ var _touch_ids: Dictionary = {}  # finger_id -> position
 var _last_tap_time: float = -10.0
 var _active_aim_finger: int = -1
 
+## Personality / reaction state for body drawing.
+var reaction: StringName = &""
+var reaction_time_left: float = 0.0
+var _peck_pulse: float = 0.0
+var _celebrate_hop: float = 0.0
+var _idle_peck_timer: float = 3.0
+
 var _chain: WormChain
 var _projectile_container: Node
 
@@ -118,9 +125,12 @@ func _ready() -> void:
 	_setup_aim_line()
 	_refresh_previews()
 	EventBus.chicken_loadout_changed.emit(current_color, next_color)
+	EventBus.chicken_react.connect(_on_react)
+	_idle_peck_timer = GameManager.get_rng().randf_range(2.5, 5.0)
 
 
 func _process(delta: float) -> void:
+	_update_reaction(delta)
 	if not GameManager.can_player_act():
 		# Still idle-animate while overlays show, but freeze aim/cooldown.
 		_update_idle(delta)
@@ -134,8 +144,6 @@ func _process(delta: float) -> void:
 	_update_idle(delta)
 	_update_aim_line()
 	_apply_body_transform()
-	_current_preview.queue_redraw()
-	_next_preview.queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -266,7 +274,6 @@ func _try_shoot() -> void:
 	if not _can_shoot or _cooldown_left > 0.0:
 		return
 	if shooting_worm_scene == null:
-		push_warning("Chicken: shooting_worm_scene is not set.")
 		return
 
 	_cooldown_left = fire_cooldown
@@ -288,17 +295,20 @@ func _advance_loadout() -> void:
 	current_color = next_color
 	next_color = GameManager.roll_worm_color()
 	# Mild anti-frustration: avoid identical current/next too often.
+	var colors: int = GameManager.get_active_color_count()
 	if next_color == current_color and GameManager.get_rng().randf() < 0.65:
-		next_color = ((int(next_color) + 1 + GameManager.get_rng().randi_range(0, 4)) % WormColor.KIND_COUNT) as WormColor.Kind
+		var step: int = 1 + GameManager.get_rng().randi_range(0, maxi(colors - 2, 0))
+		next_color = ((int(next_color) + step) % colors) as WormColor.Kind
 	_refresh_previews()
 	EventBus.chicken_loadout_changed.emit(current_color, next_color)
 
 
 func _roll_initial_loadout() -> void:
+	var colors: int = GameManager.get_active_color_count()
 	current_color = GameManager.roll_worm_color()
 	next_color = GameManager.roll_worm_color()
 	if next_color == current_color:
-		next_color = ((int(current_color) + 2) % WormColor.KIND_COUNT) as WormColor.Kind
+		next_color = ((int(current_color) + 1 + (colors / 2)) % colors) as WormColor.Kind
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +318,7 @@ func _roll_initial_loadout() -> void:
 func _play_shoot_juice() -> void:
 	_recoil_offset = recoil_distance
 	_body_scale = shoot_stretch
+	_play_reaction(&"peck", 0.16)
 	# Tiny screen-independent punch: flash aim line.
 	_aim_line.default_color.a = minf(aim_line_alpha + 0.35, 0.9)
 
@@ -338,14 +349,62 @@ func _update_idle(delta: float) -> void:
 		if _blink_left <= 0.0:
 			_is_blinking = false
 			_blink_timer = GameManager.get_rng().randf_range(blink_interval_min, blink_interval_max)
-	_body.queue_redraw()
+
+	# Occasional idle peck for personality.
+	_idle_peck_timer -= delta
+	if _idle_peck_timer <= 0.0 and reaction == &"":
+		_play_reaction(&"idle_peck", 0.22)
+		_idle_peck_timer = GameManager.get_rng().randf_range(3.0, 6.5)
+
+
+func _update_reaction(delta: float) -> void:
+	if reaction_time_left > 0.0:
+		reaction_time_left -= delta
+		if reaction_time_left <= 0.0:
+			reaction = &""
+			_peck_pulse = 0.0
+			_celebrate_hop = 0.0
+	match reaction:
+		&"peck", &"idle_peck":
+			_peck_pulse = sin((0.22 - reaction_time_left) / 0.22 * PI)
+		&"celebrate":
+			_celebrate_hop = sin((0.4 - reaction_time_left) / 0.4 * PI) * 10.0
+		&"sigh":
+			_peck_pulse = -0.3
+
+
+func _play_reaction(kind: StringName, duration: float) -> void:
+	reaction = kind
+	reaction_time_left = duration
+
+
+func _on_react(kind: StringName, _pos: Vector2) -> void:
+	match kind:
+		&"celebrate":
+			_play_reaction(&"celebrate", 0.4)
+			_body_scale = Vector2(1.15, 0.88)
+		&"peck":
+			_play_reaction(&"peck", 0.2)
+		&"sigh":
+			_play_reaction(&"sigh", 0.35)
 
 
 func _apply_body_transform() -> void:
 	var bob: float = sin(_idle_time * idle_bob_speed) * idle_bob_amplitude
+	bob -= _celebrate_hop
 	var breathe: float = 1.0 + sin(_idle_time * 2.1) * idle_breathe_amount
-	_body.position = Vector2(-_recoil_offset, bob)
-	_body.scale = _body_scale * Vector2(breathe, 1.0 / maxf(breathe, 0.001))
+	# Peck stretches the body slightly toward the beak.
+	var peck_stretch := Vector2(1.0 + _peck_pulse * 0.12, 1.0 - _peck_pulse * 0.08)
+	_body.position = Vector2(-_recoil_offset + _peck_pulse * 4.0, bob)
+	_body.scale = _body_scale * peck_stretch * Vector2(breathe, 1.0 / maxf(breathe, 0.001))
+
+
+func get_peck_amount() -> float:
+	return _peck_pulse
+
+
+func is_celebrating() -> bool:
+	return reaction == &"celebrate"
 
 
 # ---------------------------------------------------------------------------

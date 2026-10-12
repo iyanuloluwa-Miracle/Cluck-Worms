@@ -97,7 +97,13 @@ func _on_lives(lives: int, max_lives: int) -> void:
 func _on_level_started(_id: StringName, display_name: String) -> void:
 	var stage: StageDef = GameManager.get_current_stage()
 	var stage_name: String = stage.display_name if stage else "Stage"
-	_level.text = "%s  ·  %s" % [stage_name, display_name]
+	var num: int = 0
+	if GameManager.current_level_def:
+		num = GameManager.current_level_def.level_number
+	if num > 0:
+		_level.text = "%s  ·  L%d  %s" % [stage_name, num, display_name]
+	else:
+		_level.text = "%s  ·  %s" % [stage_name, display_name]
 	_status.text = ""
 
 

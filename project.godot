@@ -1,5 +1,5 @@
 ; Engine configuration file.
-; Godot 4.3+ — Cluck & Worms
+; Godot 4.3+ — Cluck & Worms (Compatibility / Web-ready)
 
 config_version=5
 
@@ -7,8 +7,9 @@ config_version=5
 
 config/name="Cluck & Worms"
 config/description="A premium Zuma-style puzzle game starring a cartoon chicken and colorful worms."
+config/version="1.0.0"
 run/main_scene="res://scenes/main/Main.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -17,18 +18,32 @@ EventBus="*res://autoload/EventBus.gd"
 SaveService="*res://autoload/SaveService.gd"
 GameManager="*res://autoload/GameManager.gd"
 AudioManager="*res://autoload/AudioManager.gd"
+QualitySettings="*res://autoload/QualitySettings.gd"
+JuiceDirector="*res://autoload/JuiceDirector.gd"
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+window/handheld/orientation=0
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.08, 0.16, 0.1, 1)
+
+[physics]
+
+common/physics_ticks_per_second=60
+2d/default_gravity=980
 
 [input_devices]
 

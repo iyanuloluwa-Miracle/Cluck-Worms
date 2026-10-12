@@ -59,6 +59,10 @@ enum Phase {
 @export var max_worms: int = 120
 @export var stop_spawn_at_cap: bool = true
 
+## When >= 0, auto-spawn stops after this many additional rear spawns.
+## -1 = infinite (sandbox). Set from LevelData.total_worms - initial.
+@export var spawns_remaining: int = -1
+
 ## Pre-warmed pool size. 0 = create a child pool automatically.
 @export var pool_warm_count: int = 64
 
@@ -174,6 +178,23 @@ func spawn_rear(color: WormColor.Kind = WormColor.Kind.RED) -> Worm:
 	return worm
 
 
+## Configure finite-level spawning. Call after seeding the initial train.
+func configure_spawn_budget(remaining_after_initial: int) -> void:
+	spawns_remaining = maxi(remaining_after_initial, 0)
+	if spawns_remaining == 0:
+		auto_spawn = false
+
+
+## Level is won only when the chain is empty and no more worms will spawn.
+func _try_emit_cleared() -> void:
+	if not _worms.is_empty():
+		return
+	# Infinite sandbox (spawns_remaining < 0) still clears when empty.
+	if spawns_remaining > 0:
+		return
+	EventBus.chain_cleared.emit(self)
+
+
 ## Structural insert with smooth gap-open (no full-chain snap).
 func insert_worm(index: int, color: WormColor.Kind, animate_open: bool = true) -> Worm:
 	index = clampi(index, 0, _worms.size())
@@ -238,7 +259,7 @@ func remove_worms(index: int, count: int, reason: StringName = &"match") -> void
 	_kickoff_falls(removed)
 
 	if _worms.is_empty():
-		EventBus.chain_cleared.emit(self)
+		_try_emit_cleared()
 
 
 ## Insert from a projectile hit, then run the full match/cascade sequence.
@@ -387,6 +408,11 @@ func _apply_match_groups(groups: Array[Dictionary], cascade_depth: int) -> void:
 		EventBus.chain_match_found.emit(self, start, count, color)
 		EventBus.cascade_step.emit(self, cascade_depth, count, color)
 		GameManager.register_match(count, color, cascade_depth)
+		# Strong opening match → explicit good-shot juice.
+		if cascade_depth == 0 and count >= 4:
+			var mid: int = clampi(start + count / 2, 0, _worms.size() - 1)
+			var shot_pos: Vector2 = _worms[mid].global_position if mid >= 0 else global_position
+			EventBus.good_shot.emit(shot_pos, count)
 		gap_index = mini(gap_index, start)
 		total_removed += count
 		for i: int in range(start, start + count):
@@ -410,7 +436,7 @@ func _apply_match_groups(groups: Array[Dictionary], cascade_depth: int) -> void:
 	_kickoff_falls(removed)
 
 	if _worms.is_empty():
-		EventBus.chain_cleared.emit(self)
+		_try_emit_cleared()
 		_finish_shot_resolve()
 		return
 
@@ -589,6 +615,9 @@ func _ensure_pool() -> void:
 
 
 func _process_auto_spawn(delta: float) -> void:
+	if spawns_remaining == 0:
+		auto_spawn = false
+		return
 	_spawn_timer += delta
 	if _spawn_timer < spawn_interval:
 		return
@@ -597,7 +626,11 @@ func _process_auto_spawn(delta: float) -> void:
 		if rear.target_path_distance < worm_spacing * 0.85:
 			return
 	_spawn_timer = 0.0
-	spawn_rear(GameManager.roll_worm_color())
+	var worm: Worm = spawn_rear(GameManager.roll_worm_color())
+	if worm != null and spawns_remaining > 0:
+		spawns_remaining -= 1
+		if spawns_remaining == 0:
+			auto_spawn = false
 
 
 func _create_worm(color: WormColor.Kind, distance: float, snap: bool) -> Worm:
