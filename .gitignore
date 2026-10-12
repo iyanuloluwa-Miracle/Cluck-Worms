@@ -1,0 +1,12 @@
+# Godot 4+
+.godot/
+*.translation
+export.cfg
+export_presets.cfg
+
+# Imported assets cache is inside .godot/
+# OS / editor
+.DS_Store
+Thumbs.db
+*.tmp
+*~
