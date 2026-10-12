@@ -1,0 +1,370 @@
+extends Node
+## Authoritative game flow: state machine, scoring, lives, progression.
+## UI and levels react via EventBus — they never drive each other directly.
+
+# ---------------------------------------------------------------------------
+# State machine
+# ---------------------------------------------------------------------------
+
+enum State {
+	MAIN_MENU,
+	PLAYING,
+	PAUSED,
+	LEVEL_COMPLETE,
+	GAME_OVER,
+	STAGE_COMPLETE,
+}
+
+# ---------------------------------------------------------------------------
+# Scoring tunables
+# ---------------------------------------------------------------------------
+
+@export var points_per_worm: int = 100
+@export var points_per_extra_worm: int = 50
+@export var large_group_bonus_threshold: int = 5
+@export var large_group_bonus_per_worm: int = 40
+@export var cascade_bonus_per_depth: int = 75
+@export var level_clear_bonus: int = 500
+@export var stage_clear_bonus: int = 1500
+@export var life_remaining_bonus: int = 250
+@export var combo_multiplier_step: float = 0.25
+@export var max_combo_multiplier: float = 5.0
+
+# ---------------------------------------------------------------------------
+# Lives / run
+# ---------------------------------------------------------------------------
+
+@export var starting_lives: int = 3
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+
+var state: State = State.MAIN_MENU
+var score: int = 0
+var combo: int = 0
+var peak_combo: int = 0
+var lives: int = 3
+var is_paused: bool = false
+
+var catalog: ProgressionCatalog
+var stage_index: int = 0
+var level_index: int = 0
+var current_level_def: LevelDef = null
+
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _state_before_pause: State = State.PLAYING
+
+
+func _ready() -> void:
+	_rng.randomize()
+	lives = starting_lives
+	catalog = ProgressionCatalog.build_default()
+	EventBus.chain_cleared.connect(_on_chain_cleared)
+	EventBus.chain_reached_end.connect(_on_chain_reached_end)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause_game"):
+		if state == State.PLAYING:
+			pause_game()
+			get_viewport().set_input_as_handled()
+		elif state == State.PAUSED:
+			resume_game()
+			get_viewport().set_input_as_handled()
+
+
+# ---------------------------------------------------------------------------
+# State queries
+# ---------------------------------------------------------------------------
+
+func get_state() -> State:
+	return state
+
+
+func is_playing() -> bool:
+	return state == State.PLAYING
+
+
+func can_player_act() -> bool:
+	return state == State.PLAYING and not is_paused
+
+
+func get_current_stage() -> StageDef:
+	return catalog.get_stage(stage_index) if catalog else null
+
+
+func get_combo_multiplier() -> float:
+	return _combo_multiplier()
+
+
+func get_rng() -> RandomNumberGenerator:
+	return _rng
+
+
+func roll_worm_color() -> WormColor.Kind:
+	return WormColor.random_kind(_rng)
+
+
+func state_name(s: State = state) -> String:
+	match s:
+		State.MAIN_MENU:
+			return "MainMenu"
+		State.PLAYING:
+			return "Playing"
+		State.PAUSED:
+			return "Paused"
+		State.LEVEL_COMPLETE:
+			return "LevelComplete"
+		State.GAME_OVER:
+			return "GameOver"
+		State.STAGE_COMPLETE:
+			return "StageComplete"
+		_:
+			return "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# Run / menu flow (called by UI via clear intent — not by Level)
+# ---------------------------------------------------------------------------
+
+func go_to_main_menu() -> void:
+	if score > 0 and state != State.MAIN_MENU:
+		_submit_high_score()
+	_set_tree_paused(false)
+	is_paused = false
+	_change_state(State.MAIN_MENU)
+	EventBus.unload_level_requested.emit()
+
+
+func start_run(from_stage: int = 0, from_level: int = 0) -> void:
+	if catalog == null or catalog.get_stage_count() == 0:
+		push_error("GameManager: no progression catalog.")
+		return
+	stage_index = clampi(from_stage, 0, catalog.get_stage_count() - 1)
+	var stage: StageDef = catalog.get_stage(stage_index)
+	level_index = clampi(from_level, 0, maxi(stage.get_level_count() - 1, 0))
+	score = 0
+	combo = 0
+	peak_combo = 0
+	lives = starting_lives
+	EventBus.score_changed.emit(score, 0)
+	EventBus.combo_changed.emit(combo)
+	EventBus.lives_changed.emit(lives, starting_lives)
+	EventBus.high_score_changed.emit(SaveService.high_score, false)
+	EventBus.run_started.emit(stage_index, level_index)
+	_load_current_level()
+
+
+func pause_game() -> void:
+	if state != State.PLAYING:
+		return
+	_state_before_pause = state
+	is_paused = true
+	_set_tree_paused(true)
+	_change_state(State.PAUSED)
+
+
+func resume_game() -> void:
+	if state != State.PAUSED:
+		return
+	is_paused = false
+	_set_tree_paused(false)
+	_change_state(State.PLAYING)
+
+
+func retry_level() -> void:
+	## Retry current level after LevelComplete overlay is not used —
+	## used from pause/game-over "retry" and life-loss reload.
+	if current_level_def == null:
+		go_to_main_menu()
+		return
+	combo = 0
+	EventBus.combo_changed.emit(combo)
+	_set_tree_paused(false)
+	is_paused = false
+	_load_current_level()
+
+
+func restart_run() -> void:
+	start_run(stage_index, 0)
+
+
+func advance_after_level_complete() -> void:
+	if state != State.LEVEL_COMPLETE:
+		return
+	var stage: StageDef = get_current_stage()
+	if stage == null:
+		go_to_main_menu()
+		return
+	if level_index + 1 < stage.get_level_count():
+		level_index += 1
+		combo = 0
+		EventBus.combo_changed.emit(combo)
+		_load_current_level()
+	else:
+		_enter_stage_complete()
+
+
+func advance_after_stage_complete() -> void:
+	if state != State.STAGE_COMPLETE:
+		return
+	if stage_index + 1 < catalog.get_stage_count():
+		stage_index += 1
+		level_index = 0
+		combo = 0
+		EventBus.combo_changed.emit(combo)
+		_load_current_level()
+	else:
+		# All stages cleared — treat as glorious game over / victory lap to menu.
+		_submit_high_score()
+		go_to_main_menu()
+
+
+# ---------------------------------------------------------------------------
+# Scoring API (WormChain)
+# ---------------------------------------------------------------------------
+
+func register_match(count: int, _color: WormColor.Kind, cascade_depth: int) -> void:
+	if not can_player_act() and state != State.PLAYING:
+		# Allow scoring if somehow mid-transition; still gate on PLAYING primarily.
+		pass
+	increment_combo()
+	var extras: int = maxi(count - WormChain.MIN_MATCH_SIZE, 0)
+	var base: int = count * points_per_worm + extras * points_per_extra_worm
+	# Large-group bonus (5+ worms).
+	if count >= large_group_bonus_threshold:
+		base += (count - large_group_bonus_threshold + 1) * large_group_bonus_per_worm
+	base += cascade_depth * cascade_bonus_per_depth
+	add_score(base)
+
+
+func notify_shot_resolved(scored_match: bool) -> void:
+	if not scored_match:
+		reset_combo()
+
+
+func add_score(base_points: int) -> void:
+	var multiplier: float = _combo_multiplier()
+	var delta: int = int(round(float(base_points) * multiplier))
+	score += delta
+	EventBus.score_changed.emit(score, delta)
+
+
+func increment_combo() -> void:
+	combo += 1
+	peak_combo = maxi(peak_combo, combo)
+	EventBus.combo_changed.emit(combo)
+
+
+func reset_combo() -> void:
+	if combo == 0:
+		return
+	combo = 0
+	EventBus.combo_changed.emit(combo)
+
+
+# ---------------------------------------------------------------------------
+# Internals — state & level load
+# ---------------------------------------------------------------------------
+
+func _change_state(next: State) -> void:
+	if state == next:
+		return
+	var previous: State = state
+	state = next
+	EventBus.game_state_changed.emit(int(previous), int(next))
+
+
+func _load_current_level() -> void:
+	var stage: StageDef = get_current_stage()
+	if stage == null:
+		push_error("GameManager: invalid stage_index %d" % stage_index)
+		go_to_main_menu()
+		return
+	var level_def: LevelDef = stage.get_level(level_index)
+	if level_def == null:
+		push_error("GameManager: invalid level_index %d" % level_index)
+		go_to_main_menu()
+		return
+	current_level_def = level_def
+	_set_tree_paused(false)
+	is_paused = false
+	_change_state(State.PLAYING)
+	EventBus.load_level_requested.emit(level_def)
+	EventBus.level_started.emit(level_def.id, level_def.display_name)
+	EventBus.lives_changed.emit(lives, starting_lives)
+	EventBus.score_changed.emit(score, 0)
+
+
+func _enter_level_complete() -> void:
+	add_score(level_clear_bonus)
+	_change_state(State.LEVEL_COMPLETE)
+	var id: StringName = current_level_def.id if current_level_def else &""
+	EventBus.level_completed.emit(id, score, lives)
+
+
+func _enter_stage_complete() -> void:
+	add_score(level_clear_bonus)
+	add_score(stage_clear_bonus + lives * life_remaining_bonus)
+	SaveService.record_stage_cleared(stage_index)
+	_submit_high_score()
+	_change_state(State.STAGE_COMPLETE)
+	var stage: StageDef = get_current_stage()
+	var sid: StringName = stage.id if stage else &""
+	EventBus.stage_completed.emit(sid, stage_index, score)
+
+
+func _enter_game_over() -> void:
+	var is_new: bool = _submit_high_score()
+	_change_state(State.GAME_OVER)
+	EventBus.game_over.emit(score, SaveService.high_score, is_new)
+
+
+func _lose_life() -> void:
+	lives = maxi(lives - 1, 0)
+	EventBus.lives_changed.emit(lives, starting_lives)
+	EventBus.life_lost.emit(lives)
+	reset_combo()
+	if lives <= 0:
+		_enter_game_over()
+	else:
+		# Remain in PLAYING after reload.
+		retry_level()
+
+
+func _submit_high_score() -> bool:
+	var is_new: bool = SaveService.try_submit_score(score, peak_combo)
+	EventBus.high_score_changed.emit(SaveService.high_score, is_new)
+	return is_new
+
+
+func _set_tree_paused(paused: bool) -> void:
+	var tree := get_tree()
+	if tree:
+		tree.paused = paused
+
+
+func _combo_multiplier() -> float:
+	var multiplier: float = 1.0 + float(maxi(combo - 1, 0)) * combo_multiplier_step
+	return minf(multiplier, max_combo_multiplier)
+
+
+# ---------------------------------------------------------------------------
+# Chain → flow
+# ---------------------------------------------------------------------------
+
+func _on_chain_cleared(_chain: WormChain) -> void:
+	if state != State.PLAYING:
+		return
+	var stage: StageDef = get_current_stage()
+	if stage != null and level_index >= stage.get_level_count() - 1:
+		_enter_stage_complete()
+	else:
+		_enter_level_complete()
+
+
+func _on_chain_reached_end(_chain: WormChain) -> void:
+	if state != State.PLAYING:
+		return
+	_lose_life()
