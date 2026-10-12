@@ -1,0 +1,46 @@
+[gd_scene load_steps=5 format=3 uid="uid://bchicken001"]
+
+[ext_resource type="Script" path="res://scripts/chicken/Chicken.gd" id="1_chicken"]
+[ext_resource type="Script" path="res://scripts/chicken/ChickenBody.gd" id="2_body"]
+[ext_resource type="Script" path="res://scripts/chicken/WormPreview.gd" id="3_preview"]
+[ext_resource type="PackedScene" uid="uid://bshootworm001" path="res://scenes/projectile/ShootingWorm.tscn" id="4_shot"]
+
+[node name="Chicken" type="Node2D"]
+script = ExtResource("1_chicken")
+shooting_worm_scene = ExtResource("4_shot")
+aim_turn_rate = 14.0
+muzzle_distance = 52.0
+fire_cooldown = 0.16
+
+[node name="NextPreview" type="Node2D" parent="."]
+position = Vector2(-56, 40)
+script = ExtResource("3_preview")
+preview_scale = 0.75
+
+[node name="NextLabel" type="Label" parent="NextPreview"]
+offset_left = -22.0
+offset_top = 16.0
+offset_right = 30.0
+offset_bottom = 36.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 12
+text = "NEXT"
+horizontal_alignment = 1
+
+[node name="AimPivot" type="Node2D" parent="."]
+
+[node name="AimLine" type="Line2D" parent="AimPivot"]
+z_index = -2
+width = 3.5
+default_color = Color(1, 1, 1, 0.35)
+begin_cap_mode = 2
+end_cap_mode = 2
+
+[node name="Body" type="Node2D" parent="AimPivot"]
+script = ExtResource("2_body")
+
+[node name="CurrentPreview" type="Node2D" parent="AimPivot/Body"]
+position = Vector2(40, 2)
+scale = Vector2(0.85, 0.85)
+script = ExtResource("3_preview")
+preview_scale = 0.95

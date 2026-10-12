@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://bshootworm001"]
+
+[ext_resource type="Script" path="res://scripts/projectile/ShootingWorm.gd" id="1_shot"]
+
+[node name="ShootingWorm" type="Area2D"]
+script = ExtResource("1_shot")
+speed = 980.0
+max_lifetime = 2.5
+hit_radius = 16.0
+
+[node name="Trail" type="Line2D" parent="."]
+z_index = -1
+width = 14.0
+default_color = Color(1, 1, 1, 0.5)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
