@@ -20,6 +20,7 @@ var _trauma: float = 0.0
 var _camera: Camera2D
 var _camera_home: Vector2 = Vector2(640, 360)
 var _look_target: Vector2 = Vector2(640, 360)
+# Kept in sync with PathFactory.CHICKEN_NEST for action pull defaults.
 var _hit_stopping: bool = false
 var _fx_host: Node2D
 
@@ -50,7 +51,7 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------------------
 
 func add_trauma(amount: float) -> void:
-	if not QualitySettings.enable_camera_shake:
+	if not QualitySettings.enable_camera_shake or SaveService.reduced_shake:
 		return
 	_trauma = clampf(_trauma + amount * QualitySettings.particle_scale, 0.0, 1.0)
 
@@ -76,6 +77,8 @@ func pull_camera_toward(world_pos: Vector2, weight: float = 1.0) -> void:
 
 
 func spawn_pop(world_pos: Vector2, color: Color, intensity: float = 1.0) -> void:
+	if SaveService.reduced_fx:
+		intensity *= 0.45
 	var host := _get_fx_host()
 	if host == null:
 		return

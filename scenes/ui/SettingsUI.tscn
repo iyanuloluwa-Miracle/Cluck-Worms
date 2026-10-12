@@ -1,0 +1,107 @@
+[gd_scene format=3 uid="uid://bsettings001"]
+
+[ext_resource type="Script" path="res://scripts/ui/SettingsUI.gd" id="1_set"]
+
+[node name="SettingsUI" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_set")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.1, 0.07, 0.94)
+
+[node name="Safe" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="VBox" type="VBoxContainer" parent="Safe"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Title" type="Label" parent="Safe/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="MasterRow" type="HBoxContainer" parent="Safe/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Safe/VBox/MasterRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Master"
+
+[node name="Slider" type="HSlider" parent="Safe/VBox/MasterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="SfxRow" type="HBoxContainer" parent="Safe/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Safe/VBox/SfxRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "SFX"
+
+[node name="Slider" type="HSlider" parent="Safe/VBox/SfxRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="MusicRow" type="HBoxContainer" parent="Safe/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Safe/VBox/MusicRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Music"
+
+[node name="Slider" type="HSlider" parent="Safe/VBox/MusicRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 0.7
+
+[node name="Mute" type="CheckButton" parent="Safe/VBox"]
+layout_mode = 2
+text = "Mute all audio"
+
+[node name="ReducedShake" type="CheckButton" parent="Safe/VBox"]
+layout_mode = 2
+text = "Reduce screen shake"
+
+[node name="ReducedFx" type="CheckButton" parent="Safe/VBox"]
+layout_mode = 2
+text = "Reduce visual effects"
+
+[node name="BackButton" type="Button" parent="Safe/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Back"

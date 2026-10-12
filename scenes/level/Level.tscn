@@ -9,9 +9,9 @@
 [sub_resource type="Curve2D" id="Curve2D_serpentine"]
 resource_local_to_scene = true
 _data = {
-"points": PackedVector2Array(-40, 0, 80, -40, 70, 380, -60, 40, 70, -50, 260, 160, -80, 30, 80, 40, 480, 520, -70, -40, 80, -30, 720, 140, -80, 20, 70, 50, 960, 460, -60, -30, 40, 0, 1200, 300)
+"points": PackedVector2Array(0, 0, 0, 0, 40, 560, 0, 0, 0, 0, 400, 680, 0, 0, 0, 0, 980, 620, 0, 0, 0, 0, 1240, 340, 0, 0, 0, 0, 860, 80, 0, 0, 0, 0, 280, 120, 0, 0, 0, 0, 60, 420)
 }
-point_count = 6
+point_count = 7
 
 [node name="Level" type="Node2D"]
 script = ExtResource("1_level")
@@ -71,6 +71,7 @@ enabled = true
 position_smoothing_enabled = false
 
 [node name="Chicken" parent="." instance=ExtResource("5_chicken")]
-position = Vector2(640, 380)
+position = Vector2(640, 400)
+z_index = 10
 chain_path = NodePath("../WormChain")
 projectile_container_path = NodePath("../Projectiles")

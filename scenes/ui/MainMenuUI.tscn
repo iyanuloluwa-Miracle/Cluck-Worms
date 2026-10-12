@@ -109,6 +109,18 @@ layout_mode = 2
 size_flags_horizontal = 4
 text = "Play"
 
+[node name="CampaignButton" type="Button" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(260, 52)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Campaign"
+
+[node name="SettingsButton" type="Button" parent="SafeArea/Content"]
+custom_minimum_size = Vector2(260, 52)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Settings"
+
 [node name="QuitButton" type="Button" parent="SafeArea/Content"]
 custom_minimum_size = Vector2(260, 52)
 layout_mode = 2

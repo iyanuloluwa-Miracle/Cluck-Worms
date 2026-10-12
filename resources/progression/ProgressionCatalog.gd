@@ -79,7 +79,25 @@ static func build_campaign() -> ProgressionCatalog:
 			6, 90.0, 0.46, 20, 72, 36.0, 0.32, Color(0.07, 0.12, 0.10)),
 	] as Array[LevelData]
 
-	catalog.stages = [stage1, stage2, stage3] as Array[StageDef]
+	var stage4 := StageDef.new()
+	stage4.id = &"stage_04"
+	stage4.display_name = "Moonlit Garden"
+	stage4.levels = [
+		_level(13, &"s4_l13", "Moon Ring", PathFactory.path_s4_l13_moon_ring(),
+			6, 88.0, 0.48, 18, 70, 36.0, 0.32, Color(0.08, 0.12, 0.18)),
+		_level(14, &"s4_l14", "Lantern Zag", PathFactory.path_s4_l14_lantern_zag(),
+			6, 90.0, 0.46, 18, 72, 36.0, 0.32, Color(0.07, 0.11, 0.17)),
+		_level(15, &"s4_l15", "Dew Spiral", PathFactory.path_s4_l15_dew_spiral(),
+			6, 92.0, 0.44, 20, 74, 35.0, 0.30, Color(0.06, 0.10, 0.16)),
+		_level(16, &"s4_l16", "Night Switch", PathFactory.path_s4_l16_night_switch(),
+			6, 94.0, 0.43, 20, 76, 35.0, 0.30, Color(0.06, 0.09, 0.15)),
+		_level(17, &"s4_l17", "Comet Coil", PathFactory.path_s4_l17_comet_coil(),
+			6, 96.0, 0.42, 20, 78, 34.0, 0.30, Color(0.05, 0.08, 0.14)),
+		_level(18, &"s4_l18", "Midnight Finale", PathFactory.path_s4_l18_midnight_finale(),
+			6, 98.0, 0.40, 22, 80, 34.0, 0.28, Color(0.04, 0.07, 0.13)),
+	] as Array[LevelData]
+
+	catalog.stages = [stage1, stage2, stage3, stage4] as Array[StageDef]
 	return catalog
 
 
@@ -112,5 +130,12 @@ static func _level(
 	data.auto_spawn = true
 	data.background_color = bg
 	data.danger_zone_length = lerpf(140.0, 100.0, float(number - 1) / 11.0)
-	data.chicken_position = Vector2(640, 380)
+	data.chicken_position = PathFactory.CHICKEN_NEST
+	# Specials appear lightly from level 5, more often later.
+	if number >= 5 and number < 9:
+		data.special_spawn_chance = 0.06
+	elif number >= 9:
+		data.special_spawn_chance = 0.10
+	else:
+		data.special_spawn_chance = 0.0
 	return data

@@ -11,12 +11,25 @@ extends Node2D
 @export var danger_zone_color: Color = Color(1.0, 0.25, 0.2, 0.30)
 @export var sample_step: float = 6.0
 
+var _danger_pulse: float = 0.0
+
 
 func _ready() -> void:
 	if path == null:
 		path = get_parent().get_node_or_null("WormPath") as Path2D
 	sample_step = QualitySettings.path_sample_step
+	EventBus.danger_warning.connect(_on_danger)
 	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if _danger_pulse > 0.0:
+		_danger_pulse = maxf(_danger_pulse - delta * 1.2, 0.0)
+		queue_redraw()
+
+
+func _on_danger(urgency: float) -> void:
+	_danger_pulse = maxf(_danger_pulse, urgency)
 
 
 func _draw() -> void:
@@ -28,9 +41,16 @@ func _draw() -> void:
 	if length <= 0.0:
 		return
 
-	# Danger zone (near end).
+	# Danger zone (near end) — pulses when the leader is close.
 	var danger_start: float = maxf(length - danger_zone_length, 0.0)
-	_draw_path_segment(curve, danger_start, length, danger_zone_color, guide_width + 6.0)
+	var pulse: float = 0.3 + _danger_pulse * 0.7
+	var danger_col := Color(
+		danger_zone_color.r,
+		danger_zone_color.g,
+		danger_zone_color.b,
+		clampf(danger_zone_color.a * pulse + _danger_pulse * 0.35, 0.15, 0.85)
+	)
+	_draw_path_segment(curve, danger_start, length, danger_col, guide_width + 6.0 + _danger_pulse * 4.0)
 
 	# Full path: solid stroke on low quality, dashed otherwise.
 	if QualitySettings.is_low():

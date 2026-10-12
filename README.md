@@ -31,13 +31,16 @@ Touch: tap the playfield to aim and shoot; tap the chicken or next-preview to sw
 
 ## Campaign
 
-**3 stages × 4 levels = 12 levels.** Each level has a finite worm budget — clear the chain after spawns run out to win.
+**4 stages × levels = 18 levels.** Each level has a finite worm budget — clear the chain after spawns run out to win. Stars (1–3) and unlocks persist locally.
 
 | Stage | Levels | Focus |
 | --- | --- | --- |
-| Farmyard Beginner | 1–4 | 3→4 colors, open paths |
-| Backyard Mayhem | 5–8 | 4→5 colors, tighter routes |
-| Chicken Apocalypse | 9–12 | 6 colors, dense finale spiral |
+| Farmyard Beginner | 1–4 | 3→4 colors, open nest-safe paths |
+| Backyard Mayhem | 5–8 | Special worms appear, tighter rings |
+| Chicken Apocalypse | 9–12 | 6 colors, dense coils |
+| Moonlit Garden | 13–18 | Expert outer routes, higher pressure |
+
+**Specials (chain):** Rainbow (wildcard), Bomb (neighbors), Slow, Bonus.
 
 Progress and high score are saved locally via `SaveService`.
 

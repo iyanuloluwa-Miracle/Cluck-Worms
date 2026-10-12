@@ -37,7 +37,7 @@ func _draw() -> void:
 	var celebrating: bool = chicken != null and chicken.is_celebrating()
 
 	# Shadow
-	draw_ellipse(Vector2(2.0, 28.0), Vector2(26.0, 8.0), Color(0.0, 0.0, 0.0, 0.22))
+	_fill_ellipse(Vector2(2.0, 28.0), Vector2(26.0, 8.0), Color(0.0, 0.0, 0.0, 0.22))
 
 	# Body
 	var body_fill := Color(1.0, 0.92, 0.45)
@@ -160,5 +160,5 @@ func _draw_oval(center: Vector2, radius_x: float, radius_y: float, color: Color,
 	draw_colored_polygon(points, color)
 
 
-func draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
+func _fill_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
 	_draw_oval(center, radii.x, radii.y, color)

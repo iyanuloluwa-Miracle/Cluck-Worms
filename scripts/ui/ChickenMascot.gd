@@ -43,7 +43,7 @@ func _draw() -> void:
 	var origin := Vector2(cx, cy)
 
 	# Soft ground shadow
-	draw_ellipse(origin + Vector2(0, 48), Vector2(42, 12), Color(0, 0, 0, 0.22))
+	_fill_ellipse(origin + Vector2(0, 48), Vector2(42, 12), Color(0, 0, 0, 0.22))
 
 	var body := Color(1.0, 0.92, 0.42)
 	var outline := Color(0.72, 0.48, 0.12)
@@ -51,10 +51,15 @@ func _draw() -> void:
 	var beak := Color(1.0, 0.62, 0.15)
 
 	# Tail
+	var tail_cols: Array[Color] = [
+		Color(0.95, 0.35, 0.25),
+		Color(0.98, 0.75, 0.2),
+		Color(0.9, 0.45, 0.15),
+	]
 	for i: int in range(3):
 		var ang: float = deg_to_rad(140.0 + float(i) * 26.0)
 		var tip: Vector2 = origin + Vector2.from_angle(ang) * 46.0 + Vector2(-10, -8)
-		var col := [Color(0.95, 0.35, 0.25), Color(0.98, 0.75, 0.2), Color(0.9, 0.45, 0.15)][i]
+		var col: Color = tail_cols[i]
 		draw_line(origin + Vector2(-22, -4), tip, col, 7.0 - float(i), true)
 		draw_circle(tip, 5.0, col)
 
@@ -118,5 +123,5 @@ func _oval(center: Vector2, rx: float, ry: float, color: Color) -> void:
 	draw_colored_polygon(pts, color)
 
 
-func draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
+func _fill_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
 	_oval(center, radii.x, radii.y, color)

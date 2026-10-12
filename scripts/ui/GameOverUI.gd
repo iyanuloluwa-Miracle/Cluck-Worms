@@ -16,11 +16,12 @@ func _ready() -> void:
 	UITheme.style_body(_body, UITheme.BODY_SIZE)
 	UITheme.apply_primary_button(_retry)
 	UITheme.apply_ghost_button(_menu)
-	_retry.text = "Try Again"
+	_retry.text = "Retry Level"
 	_menu.text = "Main Menu"
 	_retry.pressed.connect(func() -> void:
 		UIFx.punch_button(_retry)
-		GameManager.restart_run()
+		# Restart the failed level with a fresh life pool (same stage/level).
+		GameManager.start_run(GameManager.stage_index, GameManager.level_index)
 	)
 	_menu.pressed.connect(func() -> void:
 		UIFx.punch_button(_menu)

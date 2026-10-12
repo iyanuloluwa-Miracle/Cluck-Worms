@@ -28,8 +28,12 @@ extends Resource
 @export var worm_spacing: float = 40.0
 @export var auto_spawn: bool = true
 
+@export_group("Specials")
+## Chance (0–1) that a rear spawn is a special worm (rainbow/bomb/slow/bonus).
+@export_range(0.0, 0.35, 0.01) var special_spawn_chance: float = 0.0
+
 @export_group("Presentation")
-@export var chicken_position: Vector2 = Vector2(640, 380)
+@export var chicken_position: Vector2 = Vector2(640, 400)
 @export var background_color: Color = Color(0.12, 0.28, 0.16, 1)
 @export var danger_zone_length: float = 120.0
 
@@ -39,4 +43,7 @@ func get_remaining_spawns_after_initial() -> int:
 
 
 func build_curve() -> Curve2D:
-	return PathFactory.build_smooth_curve(path_points, path_smoothness)
+	var cleared: PackedVector2Array = PathFactory.ensure_chicken_clearance(
+		path_points, chicken_position, PathFactory.NEST_CLEARANCE
+	)
+	return PathFactory.build_smooth_curve(cleared, path_smoothness)

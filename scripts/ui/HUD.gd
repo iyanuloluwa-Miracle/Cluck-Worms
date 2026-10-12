@@ -30,6 +30,7 @@ func _ready() -> void:
 	EventBus.shot_resolve_finished.connect(_on_shot_resolved)
 	EventBus.life_lost.connect(_on_life_lost)
 	EventBus.chicken_loadout_changed.connect(_on_loadout)
+	EventBus.danger_warning.connect(_on_danger)
 	_on_combo(0)
 
 
@@ -128,6 +129,14 @@ func _on_shot_resolved(_chain: WormChain, scored: bool) -> void:
 
 func _on_life_lost(remaining: int) -> void:
 	_status.text = "Life lost — %d left" % remaining
+
+
+func _on_danger(urgency: float) -> void:
+	if urgency < 0.25:
+		return
+	_status.text = "DANGER!" if urgency > 0.7 else "Watch the pit…"
+	_status.add_theme_color_override("font_color", UITheme.DANGER)
+	UIFx.pulse_label(_status)
 
 
 func _on_pause() -> void:

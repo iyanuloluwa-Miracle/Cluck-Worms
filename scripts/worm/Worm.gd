@@ -46,6 +46,11 @@ const MATCH_POP_DURATION: float = 0.12
 		worm_color = value
 		queue_redraw()
 
+@export var worm_type: WormType.Kind = WormType.Kind.NORMAL:
+	set(value):
+		worm_type = value
+		queue_redraw()
+
 @export var state: State = State.SPAWNING:
 	set(value):
 		if state == value:
@@ -112,8 +117,9 @@ func _draw() -> void:
 # Public API
 # ---------------------------------------------------------------------------
 
-func setup(color: WormColor.Kind, distance: float) -> void:
+func setup(color: WormColor.Kind, distance: float, type: WormType.Kind = WormType.Kind.NORMAL) -> void:
 	worm_color = color
+	worm_type = type
 	path_distance = distance
 	target_path_distance = distance
 	chain_index = -1
@@ -152,6 +158,16 @@ func begin_match() -> void:
 
 
 func begin_fall() -> void:
+	# Detach from the marching chain so pops don't slide with the train.
+	var world_pos: Vector2 = global_position
+	var world_rot: float = global_rotation
+	var fx_host: Node = _find_fx_host()
+	if fx_host != null and get_parent() != fx_host:
+		reparent(fx_host, true)
+	elif get_parent() != null:
+		# Keep world pose if we can't find FX.
+		global_position = world_pos
+		global_rotation = world_rot
 	state = State.FALLING
 	_fall_velocity = Vector2(
 		GameManager.get_rng().randf_range(-FALL_DRIFT_RANGE, FALL_DRIFT_RANGE),
@@ -161,6 +177,19 @@ func begin_fall() -> void:
 	owning_chain = null
 	chain_index = -1
 	z_index = 12
+
+
+func _find_fx_host() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var level_host: Node = tree.current_scene.find_child("LevelHost", true, false) if tree.current_scene else null
+	if level_host and level_host.get_child_count() > 0:
+		var level: Node = level_host.get_child(0)
+		var fx: Node = level.get_node_or_null("FX")
+		if fx:
+			return fx
+	return tree.current_scene
 
 
 func kill() -> void:
@@ -177,6 +206,7 @@ func enter_pool() -> void:
 	chain_index = -1
 	path_distance = 0.0
 	target_path_distance = 0.0
+	worm_type = WormType.Kind.NORMAL
 	visible = false
 	modulate = Color.WHITE
 	scale = Vector2.ONE
@@ -254,7 +284,7 @@ func _process_matched(delta: float) -> void:
 
 func _process_falling(delta: float) -> void:
 	_fall_velocity.y += FALL_GRAVITY * delta
-	position += _fall_velocity * delta
+	global_position += _fall_velocity * delta
 	rotation += delta * 5.5
 	_fall_timer += delta
 	var fade: float = 1.0 - clampf(_fall_timer / FALL_LIFETIME, 0.0, 1.0)
@@ -293,6 +323,9 @@ func _draw_worm_body() -> void:
 
 	_draw_circle_local(Vector2(half_len + 1.0, -3.0), HEAD_RADIUS * 0.35, highlight)
 
+	# Accessibility pattern stripe unique per color.
+	_draw_color_pattern(half_len, outline)
+
 	var eye_y: float = -3.5
 	var eye_x: float = half_len + 2.0
 	_draw_circle_local(Vector2(eye_x, eye_y - 3.0), EYE_RADIUS, Color.WHITE)
@@ -310,6 +343,45 @@ func _draw_worm_body() -> void:
 		1.5,
 		true
 	)
+
+	_draw_special_badge(half_len)
+
+
+func _draw_color_pattern(half_len: float, outline: Color) -> void:
+	var mark := Color(outline, 0.55)
+	match worm_color:
+		WormColor.Kind.RED:
+			draw_line(Vector2(-half_len * 0.4, -4), Vector2(half_len * 0.4, -4), mark, 1.5, true)
+		WormColor.Kind.BLUE:
+			draw_circle(Vector2(0, 0), 2.2, mark)
+		WormColor.Kind.GREEN:
+			draw_line(Vector2(-6, 5), Vector2(6, 5), mark, 1.6, true)
+		WormColor.Kind.YELLOW:
+			for i: int in range(3):
+				draw_circle(Vector2(-8.0 + float(i) * 8.0, -5.0), 1.4, mark)
+		WormColor.Kind.PURPLE:
+			draw_line(Vector2(-8, -5), Vector2(8, 5), mark, 1.4, true)
+		WormColor.Kind.ORANGE:
+			draw_arc(Vector2(0, 0), 5.0, 0.2, PI - 0.2, 6, mark, 1.4, true)
+
+
+func _draw_special_badge(half_len: float) -> void:
+	match worm_type:
+		WormType.Kind.RAINBOW:
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 2.0), 4.5, Color(1, 1, 1, 0.95))
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 2.0), 3.0, Color(0.95, 0.4, 0.9))
+			draw_circle(Vector2(half_len - 4.0, -HEAD_RADIUS + 2.0), 2.0, Color(0.3, 0.85, 1.0))
+		WormType.Kind.BOMB:
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 1.0), 5.0, Color(0.1, 0.1, 0.1))
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 1.0), 2.5, Color(1.0, 0.35, 0.15))
+		WormType.Kind.SLOW:
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 1.0), 4.5, Color(0.55, 0.85, 1.0))
+			draw_line(Vector2(half_len - 5, -HEAD_RADIUS + 1), Vector2(half_len + 1, -HEAD_RADIUS + 1), Color(0.1, 0.25, 0.4), 1.5, true)
+		WormType.Kind.BONUS:
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 1.0), 4.5, Color(1.0, 0.85, 0.2))
+			draw_circle(Vector2(half_len - 2.0, -HEAD_RADIUS + 1.0), 2.0, Color(1.0, 1.0, 0.7))
+		_:
+			pass
 
 
 func _draw_capsule(half_len: float, half_width: float, color: Color) -> void:

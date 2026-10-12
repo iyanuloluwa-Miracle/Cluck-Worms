@@ -1,6 +1,12 @@
 class_name PathFactory
 extends RefCounted
 ## Builds smooth Curve2D paths from waypoints and ships campaign path presets.
+## All routes leave a clear nest around the chicken (classic Zuma arena).
+
+## Default shooter nest — center of the 1280×720 playfield.
+const CHICKEN_NEST: Vector2 = Vector2(640, 400)
+## Path samples stay at least this far from the chicken (worm radius + aim room).
+const NEST_CLEARANCE: float = 168.0
 
 
 static func build_smooth_curve(points: PackedVector2Array, smoothness: float = 0.42) -> Curve2D:
@@ -31,142 +37,245 @@ static func build_smooth_curve(points: PackedVector2Array, smoothness: float = 0
 	return curve
 
 
+## Push any waypoint that invades the chicken nest outward.
+static func ensure_chicken_clearance(
+	points: PackedVector2Array,
+	chicken: Vector2 = CHICKEN_NEST,
+	min_radius: float = NEST_CLEARANCE
+) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(points.size())
+	for i: int in range(points.size()):
+		var p: Vector2 = points[i]
+		var delta: Vector2 = p - chicken
+		var dist: float = delta.length()
+		if dist < min_radius:
+			if dist < 0.01:
+				out[i] = chicken + Vector2(0.0, -min_radius)
+			else:
+				out[i] = chicken + delta.normalized() * min_radius
+		else:
+			out[i] = p
+	return out
+
+
 # ---------------------------------------------------------------------------
-# Stage 1 — Farmyard Beginner (open, readable routes)
+# Stage 1 — Farmyard Beginner (outer ribbons, wide nest)
 # ---------------------------------------------------------------------------
 
 static func path_s1_l1_meadow_lane() -> PackedVector2Array:
-	## Wide gentle arc — longest reaction time.
+	## Gentle outer arc: enter left, exit right pit — nest stays open.
 	return PackedVector2Array([
-		Vector2(60, 520), Vector2(220, 420), Vector2(400, 500),
-		Vector2(580, 380), Vector2(780, 460), Vector2(980, 320),
-		Vector2(1180, 400),
+		Vector2(40, 560), Vector2(180, 640), Vector2(400, 680),
+		Vector2(700, 660), Vector2(980, 620), Vector2(1180, 520),
+		Vector2(1240, 340), Vector2(1120, 160), Vector2(860, 80),
+		Vector2(560, 70), Vector2(280, 120), Vector2(100, 240),
+		Vector2(60, 420),
 	])
 
 
 static func path_s1_l2_barn_bend() -> PackedVector2Array:
-	## Soft U then rise — introduces a single decision corner.
+	## Bottom U then climb the right wall.
 	return PackedVector2Array([
-		Vector2(80, 200), Vector2(200, 360), Vector2(180, 560),
-		Vector2(400, 620), Vector2(640, 540), Vector2(880, 600),
-		Vector2(1100, 480), Vector2(1200, 300),
+		Vector2(60, 180), Vector2(80, 400), Vector2(140, 600),
+		Vector2(360, 680), Vector2(640, 700), Vector2(920, 680),
+		Vector2(1140, 580), Vector2(1220, 380), Vector2(1160, 180),
+		Vector2(920, 80), Vector2(640, 60), Vector2(360, 90),
+		Vector2(140, 160),
 	])
 
 
 static func path_s1_l3_coop_curl() -> PackedVector2Array:
-	## Double wave — players learn to lead targets.
+	## Double outer wave — still rings the nest.
 	return PackedVector2Array([
-		Vector2(70, 140), Vector2(260, 280), Vector2(180, 460),
-		Vector2(360, 580), Vector2(560, 420), Vector2(760, 560),
-		Vector2(960, 380), Vector2(1120, 500), Vector2(1220, 280),
+		Vector2(50, 120), Vector2(220, 80), Vector2(480, 60),
+		Vector2(780, 90), Vector2(1080, 140), Vector2(1240, 300),
+		Vector2(1200, 500), Vector2(980, 660), Vector2(680, 700),
+		Vector2(380, 670), Vector2(140, 560), Vector2(60, 380),
+		Vector2(100, 200), Vector2(280, 100),
 	])
 
 
 static func path_s1_l4_hay_spiral() -> PackedVector2Array:
-	## Loose inward ribbon — stage-1 boss pacing.
+	## Loose outer spiral that never crosses the nest.
 	return PackedVector2Array([
-		Vector2(100, 100), Vector2(420, 120), Vector2(700, 200),
-		Vector2(1040, 160), Vector2(1180, 360), Vector2(980, 560),
-		Vector2(640, 620), Vector2(280, 540), Vector2(160, 340),
-		Vector2(320, 220), Vector2(560, 280), Vector2(820, 360),
+		Vector2(640, 50), Vector2(980, 70), Vector2(1220, 200),
+		Vector2(1240, 420), Vector2(1100, 620), Vector2(800, 700),
+		Vector2(460, 700), Vector2(160, 600), Vector2(50, 400),
+		Vector2(80, 180), Vector2(300, 60), Vector2(620, 50),
+		Vector2(940, 100), Vector2(1160, 260), Vector2(1120, 480),
+		Vector2(880, 620), Vector2(560, 640),
 	])
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — Backyard Mayhem (tighter, busier)
+# Stage 2 — Backyard Mayhem (tighter rings)
 # ---------------------------------------------------------------------------
 
 static func path_s2_l5_fence_zag() -> PackedVector2Array:
 	return PackedVector2Array([
-		Vector2(60, 600), Vector2(200, 420), Vector2(120, 240),
-		Vector2(320, 140), Vector2(520, 280), Vector2(420, 480),
-		Vector2(640, 580), Vector2(860, 440), Vector2(760, 220),
-		Vector2(980, 140), Vector2(1180, 300), Vector2(1100, 520),
+		Vector2(50, 640), Vector2(200, 520), Vector2(80, 320),
+		Vector2(160, 120), Vector2(420, 50), Vector2(720, 70),
+		Vector2(1040, 120), Vector2(1240, 280), Vector2(1180, 500),
+		Vector2(960, 660), Vector2(640, 710), Vector2(320, 660),
+		Vector2(100, 520), Vector2(60, 300),
 	])
 
 
 static func path_s2_l6_sprinkler_coil() -> PackedVector2Array:
-	## Partial spiral clockwise.
+	## Clockwise ring that tightens slightly — nest remains clear.
 	return PackedVector2Array([
-		Vector2(640, 80), Vector2(980, 160), Vector2(1160, 360),
-		Vector2(1020, 580), Vector2(680, 660), Vector2(300, 580),
-		Vector2(140, 360), Vector2(280, 160), Vector2(560, 180),
-		Vector2(820, 300), Vector2(860, 480), Vector2(620, 520),
+		Vector2(640, 55), Vector2(980, 90), Vector2(1220, 240),
+		Vector2(1240, 460), Vector2(1060, 640), Vector2(740, 710),
+		Vector2(400, 700), Vector2(140, 580), Vector2(50, 380),
+		Vector2(100, 160), Vector2(340, 50), Vector2(640, 55),
+		Vector2(920, 120), Vector2(1140, 280), Vector2(1100, 500),
+		Vector2(860, 640),
 	])
 
 
 static func path_s2_l7_figure_eight() -> PackedVector2Array:
-	## Infinity / figure-8 around the chicken.
+	## Wide infinity loops that orbit the nest (never through it).
 	return PackedVector2Array([
-		Vector2(80, 360), Vector2(220, 180), Vector2(420, 220),
-		Vector2(560, 360), Vector2(420, 520), Vector2(220, 560),
-		Vector2(200, 400), Vector2(400, 360), Vector2(640, 300),
-		Vector2(880, 360), Vector2(1040, 220), Vector2(1180, 300),
-		Vector2(1100, 500), Vector2(900, 580), Vector2(720, 480),
-		Vector2(880, 360), Vector2(1100, 200),
+		Vector2(60, 360), Vector2(140, 160), Vector2(360, 70),
+		Vector2(520, 160), Vector2(480, 320), Vector2(300, 420),
+		Vector2(140, 520), Vector2(280, 640), Vector2(520, 680),
+		Vector2(640, 560), Vector2(760, 680), Vector2(1000, 640),
+		Vector2(1160, 500), Vector2(1000, 360), Vector2(820, 220),
+		Vector2(980, 90), Vector2(1180, 160), Vector2(1240, 360),
 	])
 
 
 static func path_s2_l8_hedge_maze() -> PackedVector2Array:
-	## Aggressive switchbacks — stage-2 finale.
 	return PackedVector2Array([
-		Vector2(60, 120), Vector2(500, 100), Vector2(900, 140),
-		Vector2(1180, 220), Vector2(1000, 360), Vector2(600, 320),
-		Vector2(200, 380), Vector2(160, 560), Vector2(480, 620),
-		Vector2(860, 580), Vector2(1160, 640), Vector2(1080, 480),
-		Vector2(720, 440), Vector2(400, 500), Vector2(280, 300),
-		Vector2(560, 200), Vector2(900, 280),
+		Vector2(50, 100), Vector2(360, 50), Vector2(720, 60),
+		Vector2(1080, 100), Vector2(1240, 260), Vector2(1180, 460),
+		Vector2(960, 620), Vector2(640, 700), Vector2(300, 640),
+		Vector2(80, 500), Vector2(50, 280), Vector2(180, 100),
+		Vector2(460, 50), Vector2(780, 80), Vector2(1100, 180),
+		Vector2(1220, 380), Vector2(1080, 580), Vector2(760, 660),
 	])
 
 
 # ---------------------------------------------------------------------------
-# Stage 3 — Chicken Apocalypse (dense, punishing, fair)
+# Stage 3 — Chicken Apocalypse (dense outer coils)
 # ---------------------------------------------------------------------------
 
 static func path_s3_l9_storm_coil() -> PackedVector2Array:
 	return PackedVector2Array([
-		Vector2(1200, 80), Vector2(900, 60), Vector2(560, 100),
-		Vector2(220, 80), Vector2(80, 220), Vector2(140, 420),
-		Vector2(320, 560), Vector2(600, 640), Vector2(920, 600),
-		Vector2(1140, 460), Vector2(1080, 260), Vector2(860, 180),
-		Vector2(600, 240), Vector2(400, 360), Vector2(480, 520),
-		Vector2(720, 560), Vector2(960, 440),
+		Vector2(1240, 80), Vector2(900, 45), Vector2(520, 55),
+		Vector2(180, 90), Vector2(50, 240), Vector2(60, 460),
+		Vector2(200, 640), Vector2(500, 710), Vector2(860, 700),
+		Vector2(1160, 580), Vector2(1240, 360), Vector2(1120, 160),
+		Vector2(820, 70), Vector2(480, 90), Vector2(180, 200),
+		Vector2(80, 400), Vector2(180, 580), Vector2(480, 680),
+		Vector2(820, 650),
 	])
 
 
 static func path_s3_l10_nested_ribbons() -> PackedVector2Array:
 	return PackedVector2Array([
-		Vector2(40, 360), Vector2(160, 160), Vector2(400, 80),
-		Vector2(700, 120), Vector2(980, 60), Vector2(1200, 180),
-		Vector2(1100, 360), Vector2(1200, 540), Vector2(900, 660),
-		Vector2(560, 620), Vector2(240, 680), Vector2(80, 520),
-		Vector2(180, 340), Vector2(400, 280), Vector2(640, 340),
-		Vector2(880, 280), Vector2(1040, 400), Vector2(860, 520),
-		Vector2(600, 480), Vector2(400, 400),
+		Vector2(40, 360), Vector2(80, 160), Vector2(300, 50),
+		Vector2(640, 40), Vector2(980, 60), Vector2(1220, 180),
+		Vector2(1260, 400), Vector2(1180, 600), Vector2(900, 700),
+		Vector2(560, 720), Vector2(220, 640), Vector2(50, 480),
+		Vector2(70, 260), Vector2(260, 90), Vector2(560, 50),
+		Vector2(900, 80), Vector2(1180, 220), Vector2(1200, 460),
+		Vector2(980, 640), Vector2(640, 680),
 	])
 
 
 static func path_s3_l11_chaos_switch() -> PackedVector2Array:
-	## Fast direction changes — apex skill check.
 	return PackedVector2Array([
-		Vector2(100, 640), Vector2(280, 480), Vector2(120, 300),
-		Vector2(300, 140), Vector2(520, 260), Vector2(380, 440),
-		Vector2(560, 600), Vector2(780, 480), Vector2(640, 280),
-		Vector2(820, 120), Vector2(1040, 220), Vector2(920, 400),
-		Vector2(1100, 560), Vector2(1240, 400), Vector2(1120, 200),
-		Vector2(900, 80), Vector2(680, 160), Vector2(500, 80),
+		Vector2(80, 680), Vector2(280, 560), Vector2(100, 360),
+		Vector2(200, 140), Vector2(460, 50), Vector2(760, 70),
+		Vector2(1080, 140), Vector2(1240, 320), Vector2(1160, 540),
+		Vector2(900, 680), Vector2(560, 720), Vector2(240, 620),
+		Vector2(60, 440), Vector2(100, 200), Vector2(360, 60),
+		Vector2(700, 50), Vector2(1040, 120), Vector2(1240, 280),
 	])
 
 
 static func path_s3_l12_apocalypse_spiral() -> PackedVector2Array:
-	## Long inward spiral — campaign finale.
+	## Long outer spiral that slowly tightens — still clears the nest.
 	return PackedVector2Array([
-		Vector2(640, 40), Vector2(1040, 80), Vector2(1240, 280),
-		Vector2(1180, 560), Vector2(860, 700), Vector2(360, 680),
-		Vector2(60, 500), Vector2(80, 200), Vector2(320, 60),
-		Vector2(700, 100), Vector2(1060, 200), Vector2(1120, 420),
-		Vector2(900, 600), Vector2(520, 620), Vector2(220, 480),
-		Vector2(240, 260), Vector2(480, 180), Vector2(780, 240),
-		Vector2(900, 400), Vector2(720, 520), Vector2(480, 460),
-		Vector2(420, 320), Vector2(600, 300), Vector2(740, 380),
+		Vector2(640, 35), Vector2(1020, 55), Vector2(1260, 220),
+		Vector2(1260, 480), Vector2(1040, 680), Vector2(700, 730),
+		Vector2(340, 700), Vector2(60, 540), Vector2(40, 280),
+		Vector2(180, 80), Vector2(520, 35), Vector2(900, 55),
+		Vector2(1200, 180), Vector2(1220, 420), Vector2(1020, 620),
+		Vector2(680, 700), Vector2(320, 640), Vector2(80, 460),
+		Vector2(90, 220), Vector2(320, 70), Vector2(640, 45),
+		Vector2(960, 100), Vector2(1160, 280), Vector2(1100, 520),
+		Vector2(820, 650), Vector2(500, 640),
+	])
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 — Moonlit Garden (expert outer routes)
+# ---------------------------------------------------------------------------
+
+static func path_s4_l13_moon_ring() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(640, 40), Vector2(1000, 80), Vector2(1240, 260),
+		Vector2(1220, 520), Vector2(940, 700), Vector2(560, 720),
+		Vector2(200, 620), Vector2(50, 400), Vector2(120, 160),
+		Vector2(400, 50), Vector2(760, 60), Vector2(1100, 180),
+		Vector2(1180, 420), Vector2(960, 620),
+	])
+
+
+static func path_s4_l14_lantern_zag() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(50, 100), Vector2(280, 60), Vector2(560, 120),
+		Vector2(820, 50), Vector2(1120, 120), Vector2(1240, 320),
+		Vector2(1100, 520), Vector2(820, 660), Vector2(480, 700),
+		Vector2(160, 580), Vector2(60, 340), Vector2(180, 120),
+		Vector2(460, 60), Vector2(780, 140), Vector2(1080, 280),
+	])
+
+
+static func path_s4_l15_dew_spiral() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(60, 360), Vector2(120, 140), Vector2(380, 50),
+		Vector2(720, 70), Vector2(1080, 140), Vector2(1240, 360),
+		Vector2(1140, 580), Vector2(800, 700), Vector2(420, 680),
+		Vector2(120, 520), Vector2(80, 280), Vector2(260, 100),
+		Vector2(600, 60), Vector2(960, 120), Vector2(1180, 300),
+		Vector2(1080, 540), Vector2(740, 660),
+	])
+
+
+static func path_s4_l16_night_switch() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(100, 680), Vector2(320, 520), Vector2(120, 320),
+		Vector2(300, 100), Vector2(600, 60), Vector2(920, 120),
+		Vector2(1200, 280), Vector2(1120, 520), Vector2(820, 680),
+		Vector2(480, 720), Vector2(160, 580), Vector2(80, 340),
+		Vector2(220, 120), Vector2(560, 50), Vector2(940, 90),
+		Vector2(1220, 240), Vector2(1180, 480),
+	])
+
+
+static func path_s4_l17_comet_coil() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(1240, 80), Vector2(900, 40), Vector2(520, 60),
+		Vector2(160, 120), Vector2(50, 320), Vector2(100, 560),
+		Vector2(360, 700), Vector2(740, 720), Vector2(1100, 600),
+		Vector2(1240, 380), Vector2(1080, 160), Vector2(720, 70),
+		Vector2(360, 100), Vector2(100, 260), Vector2(140, 500),
+		Vector2(420, 660), Vector2(800, 640),
+	])
+
+
+static func path_s4_l18_midnight_finale() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(640, 35), Vector2(1040, 60), Vector2(1260, 240),
+		Vector2(1240, 500), Vector2(980, 700), Vector2(580, 730),
+		Vector2(200, 620), Vector2(40, 400), Vector2(80, 160),
+		Vector2(360, 45), Vector2(740, 50), Vector2(1120, 140),
+		Vector2(1220, 360), Vector2(1080, 580), Vector2(740, 690),
+		Vector2(380, 660), Vector2(100, 500), Vector2(80, 260),
+		Vector2(300, 80), Vector2(640, 50), Vector2(980, 120),
+		Vector2(1160, 320), Vector2(1040, 560), Vector2(700, 660),
 	])

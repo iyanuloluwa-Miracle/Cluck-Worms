@@ -63,3 +63,7 @@ signal projectile_hit_chain(projectile: ShootingWorm, hit_worm: Worm, chain: Wor
 signal good_shot(world_pos: Vector2, match_count: int)
 signal near_miss(world_pos: Vector2)
 signal chicken_react(reaction: StringName, world_pos: Vector2)
+signal danger_warning(urgency: float)
+signal achievement_unlocked(achievement_id: StringName)
+signal tutorial_step(step_id: StringName)
+signal settings_changed()

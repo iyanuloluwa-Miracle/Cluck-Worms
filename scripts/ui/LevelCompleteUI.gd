@@ -4,6 +4,7 @@ extends OverlayBase
 @onready var _title: Label = $Center/Panel/VBox/Title
 @onready var _score: Label = $Center/Panel/VBox/Score
 @onready var _lives: Label = $Center/Panel/VBox/Lives
+@onready var _stars: Label = $Center/Panel/VBox/Stars
 @onready var _next: Button = $Center/Panel/VBox/NextButton
 @onready var _menu: Button = $Center/Panel/VBox/MenuButton
 
@@ -37,3 +38,5 @@ func _on_level_completed(_level_id: StringName, score: int, lives: int) -> void:
 		name_str = GameManager.current_level_def.display_name
 	_score.text = "%s\n%d pts" % [name_str, score]
 	_lives.text = "Lives remaining  ·  %d" % lives
+	var stars: int = GameManager.last_level_stars
+	_stars.text = "★".repeat(stars) + "☆".repeat(maxi(3 - stars, 0))
