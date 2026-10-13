@@ -19,7 +19,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.04, 0.08, 0.05, 0.78)
+mouse_filter = 0
+color = Color(0.02, 0.05, 0.03, 0.72)
 
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -28,64 +29,86 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
-[node name="Panel" type="PanelContainer" parent="Center"]
-custom_minimum_size = Vector2(420, 0)
+[node name="StoneFrame" type="Control" parent="Center"]
+custom_minimum_size = Vector2(520, 340)
 layout_mode = 2
+mouse_filter = 0
 
-[node name="Margin" type="MarginContainer" parent="Center/Panel"]
-layout_mode = 2
+[node name="Inner" type="MarginContainer" parent="Center/StoneFrame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
+theme_override_constants/margin_top = 28
 theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 28
 
-[node name="VBox" type="VBoxContainer" parent="Center/Panel/Margin"]
+[node name="Fill" type="PanelContainer" parent="Center/StoneFrame/Inner"]
 layout_mode = 2
-theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="Center/Panel/Margin/VBox"]
+[node name="Pad" type="MarginContainer" parent="Center/StoneFrame/Inner/Fill"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 30
-text = "PLAYER PROFILE"
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 28
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "NEW USER"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="Center/Panel/Margin/VBox"]
+[node name="Subtitle" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
-text = "PLEASE ENTER YOUR NAME:"
+theme_override_font_sizes/font_size = 18
+text = "PLEASE ENTER YOUR NAME."
 horizontal_alignment = 1
 
-[node name="NameInput" type="LineEdit" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 52)
+[node name="NameInput" type="LineEdit" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
-alignment = 1
+alignment = 0
 max_length = 16
+caret_blink = true
 
-[node name="ProfilesScroll" type="ScrollContainer" parent="Center/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 36)
+[node name="ProfilesScroll" type="ScrollContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 horizontal_scroll_mode = 2
 vertical_scroll_mode = 0
 
-[node name="ProfileChips" type="HFlowContainer" parent="Center/Panel/Margin/VBox/ProfilesScroll"]
+[node name="ProfileChips" type="HFlowContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/ProfilesScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 6
 
-[node name="ButtonRow" type="HBoxContainer" parent="Center/Panel/Margin/VBox"]
+[node name="Spacer" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
-theme_override_constants/separation = 16
+
+[node name="ButtonRow" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 28
 alignment = 1
 
-[node name="OkButton" type="Button" parent="Center/Panel/Margin/VBox/ButtonRow"]
-custom_minimum_size = Vector2(130, 48)
+[node name="OkButton" type="Button" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/ButtonRow"]
+custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
 text = "OK"
 
-[node name="CancelButton" type="Button" parent="Center/Panel/Margin/VBox/ButtonRow"]
-custom_minimum_size = Vector2(130, 48)
+[node name="CancelButton" type="Button" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/ButtonRow"]
+custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
 text = "CANCEL"
