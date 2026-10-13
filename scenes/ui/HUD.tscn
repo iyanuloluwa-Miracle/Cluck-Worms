@@ -38,8 +38,8 @@ grow_horizontal = 2
 theme_override_constants/separation = 10
 
 [node name="ScoreChip" type="PanelContainer" parent="Root/Safe/TopBar"]
+custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-size_flags_horizontal = 3
 
 [node name="Margin" type="MarginContainer" parent="Root/Safe/TopBar/ScoreChip"]
 layout_mode = 2
@@ -50,8 +50,14 @@ theme_override_constants/margin_bottom = 8
 
 [node name="Score" type="Label" parent="Root/Safe/TopBar/ScoreChip/Margin"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "0"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Root/Safe/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="LivesChip" type="PanelContainer" parent="Root/Safe/TopBar"]
 layout_mode = 2
@@ -77,19 +83,33 @@ text = "Ⅱ"
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 60.0
-offset_bottom = 84.0
+offset_top = 8.0
+offset_bottom = 30.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 14
 text = ""
 horizontal_alignment = 1
 
+[node name="ProgressBar" type="ProgressBar" parent="Root/Safe"]
+custom_minimum_size = Vector2(280, 8)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -140.0
+offset_top = 34.0
+offset_right = 140.0
+offset_bottom = 42.0
+grow_horizontal = 2
+max_value = 1.0
+show_percentage = false
+
 [node name="ComboLabel" type="Label" parent="Root/Safe"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 88.0
-offset_bottom = 118.0
+offset_top = 58.0
+offset_bottom = 88.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 20
 text = ""

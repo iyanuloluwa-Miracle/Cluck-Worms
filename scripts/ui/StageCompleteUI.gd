@@ -36,4 +36,18 @@ func show_overlay() -> void:
 func _on_stage_completed(stage_id: StringName, stage_index: int, score: int) -> void:
 	var stage: StageDef = GameManager.catalog.get_stage(stage_index)
 	var name_str: String = stage.display_name if stage else str(stage_id)
-	_body.text = "%s\n%d pts" % [name_str, score]
+	_body.add_theme_color_override("font_color", UITheme.YOLK_HOT)
+	_body.text = "★ %s Cleared! ★\n%s pts" % [name_str, _format_score(score)]
+	UIFx.pulse_label(_body)
+
+
+func _format_score(n: int) -> String:
+	var s: String = str(n)
+	var out: String = ""
+	var count: int = 0
+	for i: int in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = "," + out
+	return out

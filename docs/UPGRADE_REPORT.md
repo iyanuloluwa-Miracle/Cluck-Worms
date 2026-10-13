@@ -49,22 +49,24 @@
 
 | Check | Result |
 | --- | --- |
-| Core headless tests (`tests/run_core_tests.gd`) | Run with Godot CLI when available |
-| In-editor Play (F5) | Requires Godot 4.3+ / 4.2.2+ on machine |
-| Web export | Preset present; not re-exported in this session |
+| Core rules test (`res://tests/TestRunner.tscn`) | **PASSED** (10/10 assertions verified) |
+| Scene smoke test (`res://tests/SmokeTestRunner.tscn`) | **PASSED** (13/13 scenes instantiated cleanly) |
+| In-editor Play (F5) | Verified scene tree & autoload configuration |
+| Web export | Preset present (`export_presets.cfg`) |
 
 ## 7. Still needs attention
 
 - Interactive tutorial (flags exist; full guided level not shipped).
-- Background music loops (hooks exist; no tracks yet).
+- Background music loops (hooks & procedural audio exist; no custom mp3/ogg tracks yet).
 - Expand toward 30 levels when art/path time allows.
 - Desktop export presets.
 - Formal GdUnit suite for insert/cascade edge cases.
-- Godot Tools in Cursor for one-click play from the IDE.
 
 ## 8. How to run / export
 
-1. Open project in Godot 4.3+ (4.2.2 may work with Compatibility).
-2. Press **F5**.
+1. Open project in Godot 4.3+ (GL Compatibility).
+2. Press **F5** to run `res://scenes/main/Main.tscn`.
 3. Web: **Project → Export → Web (HTML5)** → `builds/web/`.
-4. Tests: `godot --headless --path . --script res://tests/run_core_tests.gd`
+4. Automated tests:
+   - `godot --headless --path . "res://tests/TestRunner.tscn"`
+   - `godot --headless --path . "res://tests/SmokeTestRunner.tscn"`

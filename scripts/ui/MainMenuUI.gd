@@ -4,6 +4,10 @@ extends Control
 @onready var _atmosphere: Control = $Atmosphere
 @onready var _root: Control = $SafeArea/Root
 @onready var _brand: Control = $SafeArea/Root/BrandBlock
+@onready var _leaderboard: PanelContainer = $SafeArea/Root/Leaderboard
+@onready var _board_header: Label = $SafeArea/Root/Leaderboard/Pad/Col/Header
+@onready var _board_rows: VBoxContainer = $SafeArea/Root/Leaderboard/Pad/Col/Rows
+@onready var _board_empty: Label = $SafeArea/Root/Leaderboard/Pad/Col/EmptyHint
 @onready var _mascot: Control = $SafeArea/Root/Mascot
 @onready var _cta: Control = $SafeArea/Root/CTA
 @onready var _title: Label = $SafeArea/Root/BrandBlock/Title
@@ -29,6 +33,7 @@ func _ready() -> void:
 	EventBus.high_score_changed.connect(_on_high_score)
 	EventBus.game_state_changed.connect(_on_state)
 	_refresh_high_score(SaveService.high_score)
+	_refresh_leaderboard()
 	_on_state(-1, int(GameManager.state))
 
 
@@ -53,6 +58,28 @@ func _style() -> void:
 	_high_score.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.55))
 	_high_score.add_theme_constant_override("outline_size", 3)
 	_high_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	var board_style := UITheme.panel_style(Color(0.06, 0.14, 0.09, 0.72), Color(1.0, 0.88, 0.35, 0.28), 16.0)
+	board_style.content_margin_left = 0
+	board_style.content_margin_right = 0
+	board_style.content_margin_top = 0
+	board_style.content_margin_bottom = 0
+	board_style.shadow_size = 8
+	board_style.shadow_offset = Vector2(0, 4)
+	board_style.shadow_color = Color(0, 0, 0, 0.35)
+	_leaderboard.add_theme_stylebox_override("panel", board_style)
+
+	_board_header.text = "LEADERBOARD"
+	_board_header.add_theme_font_size_override("font_size", 15)
+	_board_header.add_theme_color_override("font_color", UITheme.YOLK_HOT)
+	_board_header.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.7))
+	_board_header.add_theme_constant_override("outline_size", 3)
+	_board_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_board_empty.add_theme_font_size_override("font_size", 13)
+	_board_empty.add_theme_color_override("font_color", Color(0.92, 0.95, 0.88, 0.65))
+	_board_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_board_empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	UITheme.apply_primary_button(_play_btn)
 	_play_btn.text = "PLAY"
@@ -98,6 +125,50 @@ func _refresh_high_score(high: int) -> void:
 	_high_score.text = "Best  %s" % _format_score(high)
 
 
+func _refresh_leaderboard() -> void:
+	for child: Node in _board_rows.get_children():
+		child.queue_free()
+	var entries: Array = SaveService.get_leaderboard()
+	_board_empty.visible = entries.is_empty()
+	for i: int in range(entries.size()):
+		var entry: Dictionary = entries[i] as Dictionary
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var rank := Label.new()
+		rank.custom_minimum_size = Vector2(28, 0)
+		rank.text = "#%d" % (i + 1)
+		rank.add_theme_font_size_override("font_size", 14)
+		rank.add_theme_color_override("font_color", _rank_color(i))
+		rank.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.55))
+		rank.add_theme_constant_override("outline_size", 2)
+		var name_l := Label.new()
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_l.text = String(entry.get("name", "You"))
+		name_l.add_theme_font_size_override("font_size", 14)
+		name_l.add_theme_color_override("font_color", Color(0.96, 0.97, 0.92, 0.92))
+		var score_l := Label.new()
+		score_l.text = _format_score(int(entry.get("score", 0)))
+		score_l.add_theme_font_size_override("font_size", 14)
+		score_l.add_theme_color_override("font_color", UITheme.YOLK if i == 0 else Color(1.0, 0.92, 0.55, 0.88))
+		score_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		row.add_child(rank)
+		row.add_child(name_l)
+		row.add_child(score_l)
+		_board_rows.add_child(row)
+
+
+func _rank_color(index: int) -> Color:
+	match index:
+		0:
+			return UITheme.YOLK_HOT
+		1:
+			return Color(0.85, 0.88, 0.92, 0.95)
+		2:
+			return Color(0.92, 0.72, 0.42, 0.95)
+		_:
+			return Color(0.78, 0.88, 0.78, 0.75)
+
+
 func _format_score(n: int) -> String:
 	var s: String = str(n)
 	var out: String = ""
@@ -112,6 +183,7 @@ func _format_score(n: int) -> String:
 
 func _on_high_score(high: int, is_new: bool) -> void:
 	_refresh_high_score(high)
+	_refresh_leaderboard()
 	if is_new:
 		UIFx.pulse_label(_high_score)
 
@@ -121,6 +193,7 @@ func _on_state(_prev: int, next: int) -> void:
 	if show:
 		visible = true
 		modulate.a = 1.0
+		_refresh_leaderboard()
 		_play_entrance()
 	else:
 		_stop_play_pulse()
@@ -131,10 +204,13 @@ func _on_state(_prev: int, next: int) -> void:
 
 
 func _play_entrance() -> void:
-	# Staggered reveal: atmosphere already live; brand → mascot → CTA.
+	# Staggered reveal: atmosphere already live; brand → board → mascot → CTA.
 	_brand.modulate.a = 0.0
 	_brand.scale = Vector2(0.94, 0.94)
 	_brand.pivot_offset = Vector2(_brand.size.x * 0.5, 40.0)
+	_leaderboard.modulate.a = 0.0
+	_leaderboard.scale = Vector2(0.96, 0.96)
+	_leaderboard.pivot_offset = Vector2(0.0, _leaderboard.size.y * 0.5)
 	_mascot.modulate.a = 0.0
 	_mascot.scale = Vector2(0.86, 0.86)
 	_mascot.pivot_offset = _mascot.size * 0.5
@@ -147,10 +223,12 @@ func _play_entrance() -> void:
 	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_brand, "modulate:a", 1.0, 0.42)
 	tween.tween_property(_brand, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK)
-	tween.tween_property(_mascot, "modulate:a", 1.0, 0.5).set_delay(0.1)
-	tween.tween_property(_mascot, "scale", Vector2.ONE, 0.55).set_delay(0.1).set_trans(Tween.TRANS_BACK)
-	tween.tween_property(_cta, "modulate:a", 1.0, 0.4).set_delay(0.2)
-	tween.tween_property(_cta, "scale", Vector2.ONE, 0.45).set_delay(0.2)
+	tween.tween_property(_leaderboard, "modulate:a", 1.0, 0.4).set_delay(0.08)
+	tween.tween_property(_leaderboard, "scale", Vector2.ONE, 0.45).set_delay(0.08).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(_mascot, "modulate:a", 1.0, 0.5).set_delay(0.12)
+	tween.tween_property(_mascot, "scale", Vector2.ONE, 0.55).set_delay(0.12).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(_cta, "modulate:a", 1.0, 0.4).set_delay(0.22)
+	tween.tween_property(_cta, "scale", Vector2.ONE, 0.45).set_delay(0.22)
 	tween.chain().tween_callback(_start_play_pulse)
 
 

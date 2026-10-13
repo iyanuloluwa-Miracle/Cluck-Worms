@@ -6,6 +6,8 @@ const SECTION_PROGRESS: String = "progress"
 const SECTION_LEVELS: String = "levels"
 const SECTION_SETTINGS: String = "settings"
 const SECTION_ACHIEVEMENTS: String = "achievements"
+const SECTION_LEADERBOARD: String = "leaderboard"
+const LEADERBOARD_SIZE: int = 8
 
 var high_score: int = 0
 var best_combo: int = 0
@@ -23,6 +25,8 @@ var mute_all: bool = false
 var level_records: Dictionary = {}
 ## achievement_id -> true
 var achievements: Dictionary = {}
+## Local top runs: [{ "name": String, "score": int }, ...] sorted desc.
+var leaderboard: Array = []
 
 
 func _ready() -> void:
@@ -54,6 +58,10 @@ func load_save() -> void:
 	music_volume = float(cfg.get_value(SECTION_SETTINGS, "music_volume", 0.7))
 	mute_all = bool(cfg.get_value(SECTION_SETTINGS, "mute_all", false))
 	max_level_unlocked = maxi(max_level_unlocked, 1)
+	leaderboard = cfg.get_value(SECTION_LEADERBOARD, "entries", []) as Array
+	if leaderboard == null:
+		leaderboard = []
+	_migrate_leaderboard_from_high_score()
 
 
 func _reset_defaults() -> void:
@@ -64,6 +72,7 @@ func _reset_defaults() -> void:
 	tutorial_done = false
 	level_records = {}
 	achievements = {}
+	leaderboard = []
 
 
 func save() -> void:
@@ -76,6 +85,7 @@ func save() -> void:
 	cfg.set_value(SECTION_PROGRESS, "tutorial_done", tutorial_done)
 	cfg.set_value(SECTION_LEVELS, "records", level_records)
 	cfg.set_value(SECTION_ACHIEVEMENTS, "flags", achievements)
+	cfg.set_value(SECTION_LEADERBOARD, "entries", leaderboard)
 	cfg.set_value(SECTION_SETTINGS, "reduced_shake", reduced_shake)
 	cfg.set_value(SECTION_SETTINGS, "reduced_fx", reduced_fx)
 	cfg.set_value(SECTION_SETTINGS, "master_volume", master_volume)
@@ -92,9 +102,41 @@ func try_submit_score(score: int, peak_combo: int = 0) -> bool:
 		high_score = score
 	if combo_improved:
 		best_combo = peak_combo
-	if is_new_high or combo_improved:
+	var board_changed: bool = _insert_leaderboard(score, "You")
+	if is_new_high or combo_improved or board_changed:
 		save()
 	return is_new_high
+
+
+func get_leaderboard() -> Array:
+	return leaderboard.duplicate(true)
+
+
+func _insert_leaderboard(score: int, player_name: String = "You") -> bool:
+	if score <= 0:
+		return false
+	if leaderboard.size() >= LEADERBOARD_SIZE:
+		var last: Dictionary = leaderboard[leaderboard.size() - 1] as Dictionary
+		if score <= int(last.get("score", 0)):
+			return false
+	# Skip exact duplicate of current #1 (retry spam).
+	if not leaderboard.is_empty():
+		var top: Dictionary = leaderboard[0] as Dictionary
+		if int(top.get("score", 0)) == score and String(top.get("name", "")) == player_name:
+			return false
+	leaderboard.append({"name": player_name, "score": score})
+	leaderboard.sort_custom(func(a: Variant, b: Variant) -> bool:
+		return int((a as Dictionary).get("score", 0)) > int((b as Dictionary).get("score", 0))
+	)
+	if leaderboard.size() > LEADERBOARD_SIZE:
+		leaderboard.resize(LEADERBOARD_SIZE)
+	return true
+
+
+func _migrate_leaderboard_from_high_score() -> void:
+	if leaderboard.is_empty() and high_score > 0:
+		leaderboard = [{"name": "You", "score": high_score}]
+		save()
 
 
 func record_stage_cleared(stage_index: int) -> void:

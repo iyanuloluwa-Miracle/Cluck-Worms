@@ -108,9 +108,9 @@ var _projectile_container: Node
 
 @onready var _aim_pivot: Node2D = $AimPivot
 @onready var _body: Node2D = $AimPivot/Body
-@onready var _aim_line: Line2D = $AimPivot/AimLine
+@onready var _aim_line: Node2D = $AimPivot/AimLine
 @onready var _current_preview: Node2D = $AimPivot/Body/CurrentPreview
-@onready var _next_preview: Node2D = $NextPreview
+@onready var _next_preview: Node2D = $AimPivot/Body/NextPreview if has_node("AimPivot/Body/NextPreview") else ($NextPreview if has_node("NextPreview") else null)
 
 
 func _ready() -> void:
@@ -241,29 +241,31 @@ func _update_aim(delta: float) -> void:
 
 
 func _setup_aim_line() -> void:
-	_aim_line.clear_points()
-	_aim_line.width = 3.0
-	_aim_line.default_color = Color(1.0, 1.0, 1.0, aim_line_alpha)
+	if _aim_line is Line2D:
+		(_aim_line as Line2D).clear_points()
+		(_aim_line as Line2D).width = 3.0
+		(_aim_line as Line2D).default_color = Color(1.0, 1.0, 1.0, aim_line_alpha)
 	_aim_line.z_index = -1
 	_aim_line.show_behind_parent = true
 
 
 func _update_aim_line() -> void:
-	var fill: Color = WormColor.get_fill(current_color)
-	_aim_line.clear_points()
-	_aim_line.default_color = Color(fill.r, fill.g, fill.b, aim_line_alpha)
-	_aim_line.add_point(Vector2(muzzle_distance * 0.45, 0.0))
-	_aim_line.add_point(Vector2(aim_line_length, 0.0))
-	_aim_line.width = 3.5
-	# Soft tip fade via gradient.
-	if _aim_line.gradient == null:
-		var gradient := Gradient.new()
-		_aim_line.gradient = gradient
-	_aim_line.gradient.colors = PackedColorArray([
-		Color(fill.r, fill.g, fill.b, aim_line_alpha + 0.15),
-		Color(fill.r, fill.g, fill.b, 0.0),
-	])
-	_aim_line.gradient.offsets = PackedFloat32Array([0.0, 1.0])
+	if _aim_line.has_method("update_trajectory"):
+		_aim_line.update_trajectory(
+			current_color,
+			muzzle_distance,
+			_chain,
+			_aim_angle,
+			global_position
+		)
+	elif _aim_line is Line2D:
+		var fill: Color = WormColor.get_fill(current_color)
+		var line_2d := _aim_line as Line2D
+		line_2d.clear_points()
+		line_2d.default_color = Color(fill.r, fill.g, fill.b, aim_line_alpha)
+		line_2d.add_point(Vector2(muzzle_distance * 0.45, 0.0))
+		line_2d.add_point(Vector2(aim_line_length, 0.0))
+		line_2d.width = 3.5
 
 
 # ---------------------------------------------------------------------------
@@ -319,18 +321,23 @@ func _play_shoot_juice() -> void:
 	_recoil_offset = recoil_distance
 	_body_scale = shoot_stretch
 	_play_reaction(&"peck", 0.16)
-	# Tiny screen-independent punch: flash aim line.
-	_aim_line.default_color.a = minf(aim_line_alpha + 0.35, 0.9)
+	if _aim_line.has_method("trigger_shoot_flash"):
+		_aim_line.trigger_shoot_flash()
+	elif _aim_line is Line2D:
+		(_aim_line as Line2D).default_color.a = minf(aim_line_alpha + 0.35, 0.9)
 
 
 func _play_swap_juice() -> void:
-	# Quick spin-nudge on the next preview so the swap reads instantly.
-	var tween := create_tween()
-	tween.tween_property(_next_preview, "scale", Vector2(1.25, 1.25), 0.06)
-	tween.tween_property(_next_preview, "scale", Vector2.ONE, 0.10)
-	var tween_cur := create_tween()
-	tween_cur.tween_property(_current_preview, "scale", Vector2(0.7, 0.7), 0.05)
-	tween_cur.tween_property(_current_preview, "scale", Vector2.ONE, 0.10)
+	if _next_preview:
+		var base_scale: Vector2 = _next_preview.scale
+		var tween := create_tween()
+		tween.tween_property(_next_preview, "scale", base_scale * 1.3, 0.06)
+		tween.tween_property(_next_preview, "scale", base_scale, 0.10)
+	if _current_preview:
+		var cur_scale: Vector2 = _current_preview.scale
+		var tween_cur := create_tween()
+		tween_cur.tween_property(_current_preview, "scale", cur_scale * 0.75, 0.05)
+		tween_cur.tween_property(_current_preview, "scale", cur_scale, 0.10)
 
 
 func _update_recoil(delta: float) -> void:
@@ -467,12 +474,12 @@ func _screen_to_world(screen_pos: Vector2) -> Vector2:
 # ---------------------------------------------------------------------------
 
 func _refresh_previews() -> void:
-	if _current_preview.has_method("set_preview_color"):
+	if _current_preview and _current_preview.has_method("set_preview_color"):
 		_current_preview.set_preview_color(current_color)
-	if _next_preview.has_method("set_preview_color"):
+		_current_preview.queue_redraw()
+	if _next_preview and _next_preview.has_method("set_preview_color"):
 		_next_preview.set_preview_color(next_color)
-	_current_preview.queue_redraw()
-	_next_preview.queue_redraw()
+		_next_preview.queue_redraw()
 
 
 ## Called by Level after paths are assigned (and safe to call from _ready).

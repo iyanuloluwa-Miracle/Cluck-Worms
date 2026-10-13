@@ -31,10 +31,24 @@ func _ready() -> void:
 
 
 func _on_game_over(final_score: int, high_score: int, is_new_high: bool) -> void:
-	var high_line: String = "Best  ·  %d" % high_score
+	var formatted_score: String = _format_score(final_score)
+	var formatted_high: String = _format_score(high_score)
 	if is_new_high:
-		high_line = "NEW BEST  ·  %d!" % high_score
-		_body.add_theme_color_override("font_color", UITheme.YOLK)
+		_body.add_theme_color_override("font_color", UITheme.YOLK_HOT)
+		_body.text = "%s pts\n★ NEW BEST  ·  %s! ★" % [formatted_score, formatted_high]
+		UIFx.pulse_label(_body)
 	else:
 		_body.add_theme_color_override("font_color", UITheme.CREAM)
-	_body.text = "%d pts\n%s" % [final_score, high_line]
+		_body.text = "%s pts\nBest  ·  %s" % [formatted_score, formatted_high]
+
+
+func _format_score(n: int) -> String:
+	var s: String = str(n)
+	var out: String = ""
+	var count: int = 0
+	for i: int in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = "," + out
+	return out

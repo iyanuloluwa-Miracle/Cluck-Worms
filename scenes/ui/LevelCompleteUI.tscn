@@ -19,7 +19,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.02, 0.05, 0.03, 0.74)
+color = Color(0.02, 0.05, 0.03, 0.76)
 
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -30,44 +30,61 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="Center"]
-custom_minimum_size = Vector2(340, 0)
+custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 
 [node name="VBox" type="VBoxContainer" parent="Center/Panel"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Center/Panel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
+theme_override_font_sizes/font_size = 36
 text = "Level Clear!"
 horizontal_alignment = 1
 
-[node name="Score" type="Label" parent="Center/Panel/VBox"]
+[node name="LevelName" type="Label" parent="Center/Panel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Score"
-horizontal_alignment = 1
-
-[node name="Lives" type="Label" parent="Center/Panel/VBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 15
-text = "Lives"
+theme_override_font_sizes/font_size = 16
+text = ""
 horizontal_alignment = 1
 
 [node name="Stars" type="Label" parent="Center/Panel/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 0.85, 0.25, 1)
-text = "★★★"
+theme_override_font_sizes/font_size = 38
+theme_override_colors/font_color = Color(1, 0.88, 0.25, 1)
+text = "☆☆☆"
+horizontal_alignment = 1
+
+[node name="Score" type="Label" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "0 pts"
+horizontal_alignment = 1
+
+[node name="Best" type="Label" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = ""
+horizontal_alignment = 1
+
+[node name="CascadeHint" type="Label" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = ""
 horizontal_alignment = 1
 
 [node name="NextButton" type="Button" parent="Center/Panel/VBox"]
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-text = "Next Level"
+text = "Next Level  →"
+
+[node name="ReplayButton" type="Button" parent="Center/Panel/VBox"]
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+text = "↺  Replay"
 
 [node name="MenuButton" type="Button" parent="Center/Panel/VBox"]
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 text = "Main Menu"

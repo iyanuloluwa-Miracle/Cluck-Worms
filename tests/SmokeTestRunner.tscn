@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://csmoketest001"]
+
+[ext_resource type="Script" path="res://tests/smoke_test_scenes.gd" id="1_smoke"]
+
+[node name="SmokeTestRunner" type="Node"]
+script = ExtResource("1_smoke")

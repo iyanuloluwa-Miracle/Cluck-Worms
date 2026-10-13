@@ -69,15 +69,56 @@ theme_override_font_sizes/font_size = 15
 text = "Best  0"
 horizontal_alignment = 1
 
+[node name="Leaderboard" type="PanelContainer" parent="SafeArea/Root"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.5
+anchor_right = 0.0
+anchor_bottom = 0.5
+offset_left = 8.0
+offset_top = -168.0
+offset_right = 268.0
+offset_bottom = 168.0
+mouse_filter = 2
+
+[node name="Pad" type="MarginContainer" parent="SafeArea/Root/Leaderboard"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="Col" type="VBoxContainer" parent="SafeArea/Root/Leaderboard/Pad"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="Label" parent="SafeArea/Root/Leaderboard/Pad/Col"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "LEADERBOARD"
+horizontal_alignment = 1
+
+[node name="Rows" type="VBoxContainer" parent="SafeArea/Root/Leaderboard/Pad/Col"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="EmptyHint" type="Label" parent="SafeArea/Root/Leaderboard/Pad/Col"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Clear a level to climb the board."
+horizontal_alignment = 1
+autowrap_mode = 2
+
 [node name="Mascot" type="Control" parent="SafeArea/Root"]
 layout_mode = 0
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -150.0
+offset_left = -110.0
 offset_top = -70.0
-offset_right = 150.0
+offset_right = 190.0
 offset_bottom = 230.0
 script = ExtResource("2_mascot")
 

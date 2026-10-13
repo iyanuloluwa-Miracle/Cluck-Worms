@@ -19,9 +19,15 @@ Use this before shipping a build.
 
 ## Content
 
-- [ ] All 12 levels clearable (finite `total_worms`)
-- [ ] High score persists across refresh (`SaveService`)
+- [ ] All 18 campaign levels clearable across 4 stages (Farmyard, Backyard, Apocalypse, Moonlit)
+- [ ] Stars (1-3) and personal best scores persist across sessions (`SaveService`)
+- [ ] Top 8 leaderboard tracks best runs
 - [ ] Icon / description / version set in Project Settings
+
+## Automated Tests
+
+- [ ] Core tests: `godot --headless --path . "res://tests/TestRunner.tscn"`
+- [ ] Scene smoke tests: `godot --headless --path . "res://tests/SmokeTestRunner.tscn"`
 
 ## Optional art / audio swap
 
