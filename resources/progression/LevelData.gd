@@ -46,4 +46,9 @@ func build_curve() -> Curve2D:
 	var cleared: PackedVector2Array = PathFactory.ensure_chicken_clearance(
 		path_points, chicken_position, PathFactory.NEST_CLEARANCE
 	)
+	# After nest push, pull any top-edge ribbon out from under the stone HUD bar.
+	cleared = PathFactory.ensure_hud_clearance(cleared)
+	cleared = PathFactory.ensure_chicken_clearance(
+		cleared, chicken_position, PathFactory.NEST_CLEARANCE
+	)
 	return PathFactory.build_smooth_curve(cleared, path_smoothness)

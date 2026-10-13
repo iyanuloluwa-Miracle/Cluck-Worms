@@ -9,7 +9,7 @@
 [sub_resource type="Curve2D" id="Curve2D_serpentine"]
 resource_local_to_scene = true
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, 40, 560, 0, 0, 0, 0, 400, 680, 0, 0, 0, 0, 980, 620, 0, 0, 0, 0, 1240, 340, 0, 0, 0, 0, 860, 80, 0, 0, 0, 0, 280, 120, 0, 0, 0, 0, 60, 420)
+"points": PackedVector2Array(0, 0, 0, 0, 40, 560, 0, 0, 0, 0, 400, 680, 0, 0, 0, 0, 980, 620, 0, 0, 0, 0, 1240, 340, 0, 0, 0, 0, 860, 118, 0, 0, 0, 0, 280, 130, 0, 0, 0, 0, 60, 420)
 }
 point_count = 7
 

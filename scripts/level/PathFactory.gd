@@ -7,6 +7,12 @@ extends RefCounted
 const CHICKEN_NEST: Vector2 = Vector2(640, 400)
 ## Path samples stay at least this far from the chicken (worm radius + aim room).
 const NEST_CLEARANCE: float = 168.0
+## Keep the train below the carved stone HUD bar (Safe top 10 + bar 72 + worm/nest pad).
+const HUD_TOP_SAFE: float = 118.0
+## Keep clear of the bottom NEXT chip / status strip.
+const HUD_BOTTOM_SAFE: float = 648.0
+const PLAYFIELD_WIDTH: float = 1280.0
+const PLAYFIELD_MARGIN_X: float = 28.0
 
 
 static func build_smooth_curve(points: PackedVector2Array, smoothness: float = 0.42) -> Curve2D:
@@ -56,6 +62,20 @@ static func ensure_chicken_clearance(
 				out[i] = chicken + delta.normalized() * min_radius
 		else:
 			out[i] = p
+	return out
+
+
+## Clamp waypoints so the chain never rides under the HUD chrome.
+static func ensure_hud_clearance(points: PackedVector2Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(points.size())
+	var max_x: float = PLAYFIELD_WIDTH - PLAYFIELD_MARGIN_X
+	for i: int in range(points.size()):
+		var p: Vector2 = points[i]
+		out[i] = Vector2(
+			clampf(p.x, PLAYFIELD_MARGIN_X, max_x),
+			clampf(p.y, HUD_TOP_SAFE, HUD_BOTTOM_SAFE)
+		)
 	return out
 
 
