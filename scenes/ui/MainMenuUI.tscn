@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://bmainmenu001"]
+[gd_scene load_steps=4 format=3 uid="uid://bmainmenu001"]
 
 [ext_resource type="Script" path="res://scripts/ui/MainMenuUI.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/ui/ChickenMascot.gd" id="2_mascot"]
+[ext_resource type="Script" path="res://scripts/ui/MenuAtmosphere.gd" id="3_atmo"]
 
 [node name="MainMenuUI" type="Control"]
 layout_mode = 3
@@ -12,7 +13,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="Atmosphere" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,26 +21,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.12, 0.28, 0.18, 1)
-
-[node name="GradientTop" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 220.0
-grow_horizontal = 2
-mouse_filter = 2
-color = Color(0.16, 0.36, 0.22, 0.55)
-
-[node name="Vignette" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.02, 0.06, 0.03, 0.3)
+script = ExtResource("3_atmo")
 
 [node name="SafeArea" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -48,81 +30,94 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 32
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 32
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 36
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 28
 
-[node name="Content" type="VBoxContainer" parent="SafeArea"]
+[node name="Root" type="Control" parent="SafeArea"]
 layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
-theme_override_constants/separation = 14
+
+[node name="BrandBlock" type="VBoxContainer" parent="SafeArea/Root"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -320.0
+offset_top = 8.0
+offset_right = 320.0
+offset_bottom = 220.0
+grow_horizontal = 2
+theme_override_constants/separation = 6
 alignment = 1
 
-[node name="Mascot" type="Control" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(180, 180)
+[node name="Title" type="Label" parent="SafeArea/Root/BrandBlock"]
 layout_mode = 2
-size_flags_horizontal = 4
-script = ExtResource("2_mascot")
-
-[node name="Title" type="Label" parent="SafeArea/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 64
 text = "Cluck & Worms"
 horizontal_alignment = 1
 
-[node name="Tagline" type="Label" parent="SafeArea/Content"]
+[node name="Tagline" type="Label" parent="SafeArea/Root/BrandBlock"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Feed the frenzy. Match the worms."
+text = "Aim. Match. Cascade."
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Spacer" type="Control" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(0, 6)
+[node name="HighScore" type="Label" parent="SafeArea/Root/BrandBlock"]
 layout_mode = 2
-
-[node name="HighScoreChip" type="PanelContainer" parent="SafeArea/Content"]
-layout_mode = 2
-size_flags_horizontal = 4
-
-[node name="Margin" type="MarginContainer" parent="SafeArea/Content/HighScoreChip"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 8
-
-[node name="HighScore" type="Label" parent="SafeArea/Content/HighScoreChip/Margin"]
-layout_mode = 2
-text = "★  High Score  0"
+theme_override_font_sizes/font_size = 15
+text = "Best  0"
 horizontal_alignment = 1
 
-[node name="Spacer2" type="Control" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
+[node name="Mascot" type="Control" parent="SafeArea/Root"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -70.0
+offset_right = 150.0
+offset_bottom = 230.0
+script = ExtResource("2_mascot")
 
-[node name="PlayButton" type="Button" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(260, 56)
+[node name="CTA" type="VBoxContainer" parent="SafeArea/Root"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -210.0
+offset_right = 170.0
+offset_bottom = -12.0
+grow_horizontal = 2
+theme_override_constants/separation = 10
+alignment = 2
+
+[node name="PlayButton" type="Button" parent="SafeArea/Root/CTA"]
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
-size_flags_horizontal = 4
 text = "Play"
 
-[node name="CampaignButton" type="Button" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(260, 52)
+[node name="SecondaryRow" type="HBoxContainer" parent="SafeArea/Root/CTA"]
 layout_mode = 2
-size_flags_horizontal = 4
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="CampaignButton" type="Button" parent="SafeArea/Root/CTA/SecondaryRow"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
 text = "Campaign"
 
-[node name="SettingsButton" type="Button" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(260, 52)
+[node name="SettingsButton" type="Button" parent="SafeArea/Root/CTA/SecondaryRow"]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-size_flags_horizontal = 4
+size_flags_horizontal = 3
 text = "Settings"
 
-[node name="QuitButton" type="Button" parent="SafeArea/Content"]
-custom_minimum_size = Vector2(260, 52)
+[node name="QuitButton" type="Button" parent="SafeArea/Root/CTA"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-size_flags_horizontal = 4
 text = "Quit"

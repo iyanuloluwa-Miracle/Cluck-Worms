@@ -1,13 +1,23 @@
 extends Control
-## Campaign map — stages and levels with lock / stars / best score.
+## Premium campaign map — opaque overlay, large level tiles, stage tabs.
 
 signal closed
 
-@onready var _backdrop: ColorRect = $Backdrop
-@onready var _title: Label = $Safe/VBox/Title
+const STAGE_SHORT: Array[String] = [
+	"Farmyard",
+	"Backyard",
+	"Apocalypse",
+	"Moonlit",
+]
+
+@onready var _title: Label = $Safe/VBox/Header/Title
+@onready var _subtitle: Label = $Safe/VBox/Header/Subtitle
 @onready var _stage_tabs: HBoxContainer = $Safe/VBox/StageTabs
-@onready var _grid: GridContainer = $Safe/VBox/Scroll/Grid
-@onready var _back: Button = $Safe/VBox/BackButton
+@onready var _stage_hint: Label = $Safe/VBox/StageHint
+@onready var _grid: GridContainer = $Safe/VBox/CenterWrap/Scroll/Grid
+@onready var _scroll: ScrollContainer = $Safe/VBox/CenterWrap/Scroll
+@onready var _back: Button = $Safe/VBox/Footer/BackButton
+@onready var _panel_root: Control = $Safe/VBox
 
 var _stage_index: int = 0
 
@@ -15,26 +25,60 @@ var _stage_index: int = 0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
+	z_index = 20
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_backdrop.color = Color(0.05, 0.12, 0.08, 0.94)
-	UITheme.style_title(_title, UITheme.HEADING_SIZE)
-	_title.text = "Campaign"
-	UITheme.apply_ghost_button(_back)
-	_back.text = "Back"
-	_back.pressed.connect(func() -> void:
-		visible = false
-		closed.emit()
-	)
+	_style_chrome()
+	_back.pressed.connect(_on_back)
 	_rebuild_stage_tabs()
 	_rebuild_grid()
 
 
 func open_select() -> void:
 	visible = true
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	_rebuild_stage_tabs()
 	_rebuild_grid()
-	modulate.a = 0.0
-	UIFx.fade_in(self, 0.2)
+	_panel_root.modulate.a = 0.0
+	_panel_root.scale = Vector2(0.96, 0.96)
+	_panel_root.pivot_offset = _panel_root.size * 0.5
+	modulate.a = 1.0
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_panel_root, "modulate:a", 1.0, 0.28)
+	tween.tween_property(_panel_root, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK)
+
+
+func _style_chrome() -> void:
+	_title.text = "Campaign"
+	_title.add_theme_font_size_override("font_size", 52)
+	_title.add_theme_color_override("font_color", UITheme.YOLK_HOT)
+	_title.add_theme_color_override("font_outline_color", Color(0.06, 0.14, 0.08, 0.95))
+	_title.add_theme_constant_override("outline_size", 12)
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_subtitle.text = "Clear levels to unlock the path ahead"
+	_subtitle.add_theme_font_size_override("font_size", 17)
+	_subtitle.add_theme_color_override("font_color", Color(0.95, 0.96, 0.9, 0.85))
+	_subtitle.add_theme_color_override("font_outline_color", Color(0.04, 0.1, 0.05, 0.7))
+	_subtitle.add_theme_constant_override("outline_size", 3)
+	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_stage_hint.add_theme_font_size_override("font_size", 18)
+	_stage_hint.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 0.95))
+	_stage_hint.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.65))
+	_stage_hint.add_theme_constant_override("outline_size", 3)
+	_stage_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	UITheme.apply_ghost_button(_back)
+	_back.text = "←  Back"
+	_back.custom_minimum_size = Vector2(220, 52)
+
+
+func _on_back() -> void:
+	UIFx.punch_button(_back)
+	visible = false
+	closed.emit()
 
 
 func _rebuild_stage_tabs() -> void:
@@ -45,13 +89,15 @@ func _rebuild_stage_tabs() -> void:
 	for i: int in range(GameManager.catalog.get_stage_count()):
 		var stage: StageDef = GameManager.catalog.get_stage(i)
 		var btn := Button.new()
-		btn.text = stage.display_name if stage else "Stage %d" % (i + 1)
-		btn.custom_minimum_size = Vector2(0, 48)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var short: String = STAGE_SHORT[i] if i < STAGE_SHORT.size() else "Stage %d" % (i + 1)
+		btn.text = short
+		btn.tooltip_text = stage.display_name if stage else short
+		btn.custom_minimum_size = Vector2(150, 50)
+		btn.focus_mode = Control.FOCUS_NONE
 		if i == _stage_index:
-			UITheme.apply_primary_button(btn)
+			_style_tab_active(btn)
 		else:
-			UITheme.apply_ghost_button(btn)
+			_style_tab_idle(btn)
 		var idx: int = i
 		btn.pressed.connect(func() -> void:
 			_stage_index = idx
@@ -59,6 +105,42 @@ func _rebuild_stage_tabs() -> void:
 			_rebuild_grid()
 		)
 		_stage_tabs.add_child(btn)
+
+	var st: StageDef = GameManager.catalog.get_stage(_stage_index)
+	_stage_hint.text = st.display_name if st else "Stage"
+
+
+func _style_tab_active(btn: Button) -> void:
+	var s := UITheme.button_normal()
+	s.set_corner_radius_all(18)
+	s.shadow_size = 8
+	btn.add_theme_stylebox_override("normal", s)
+	btn.add_theme_stylebox_override("hover", s)
+	btn.add_theme_stylebox_override("pressed", s)
+	btn.add_theme_stylebox_override("focus", s)
+	btn.add_theme_color_override("font_color", UITheme.MEADOW_DEEP)
+	btn.add_theme_font_size_override("font_size", 17)
+
+
+func _style_tab_idle(btn: Button) -> void:
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(0.06, 0.14, 0.09, 0.92)
+	s.border_color = Color(1, 1, 1, 0.22)
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(18)
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 10
+	s.content_margin_bottom = 10
+	btn.add_theme_stylebox_override("normal", s)
+	var h := s.duplicate() as StyleBoxFlat
+	h.border_color = UITheme.YOLK
+	btn.add_theme_stylebox_override("hover", h)
+	btn.add_theme_stylebox_override("pressed", h)
+	btn.add_theme_stylebox_override("focus", h)
+	btn.add_theme_color_override("font_color", UITheme.CREAM)
+	btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
+	btn.add_theme_font_size_override("font_size", 16)
 
 
 func _rebuild_grid() -> void:
@@ -69,25 +151,125 @@ func _rebuild_grid() -> void:
 	var stage: StageDef = GameManager.catalog.get_stage(_stage_index)
 	if stage == null:
 		return
-	for i: int in range(stage.get_level_count()):
+
+	var count: int = stage.get_level_count()
+	_grid.columns = mini(count, 4) if count > 0 else 4
+
+	# Fit scroll width to cards.
+	var card_w: float = 210.0
+	var gap: float = 16.0
+	var cols: int = _grid.columns
+	_scroll.custom_minimum_size = Vector2(
+		float(cols) * card_w + float(maxi(cols - 1, 0)) * gap + 8.0,
+		360.0
+	)
+
+	for i: int in range(count):
 		var level: LevelData = stage.get_level(i)
 		var unlocked: bool = SaveService.is_level_unlocked(level.level_number)
 		var stars: int = SaveService.get_level_stars(level.id)
 		var best: int = SaveService.get_level_best_score(level.id)
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(140, 96)
-		var star_txt: String = "★".repeat(stars) + "☆".repeat(maxi(3 - stars, 0))
-		if unlocked:
-			btn.text = "L%d\n%s\n%s\n%d" % [level.level_number, level.display_name, star_txt, best]
-			UITheme.apply_primary_button(btn) if stars > 0 else UITheme.apply_ghost_button(btn)
-			var s_idx: int = _stage_index
-			var l_idx: int = i
-			btn.pressed.connect(func() -> void:
-				visible = false
-				GameManager.start_run(s_idx, l_idx)
-			)
-		else:
-			btn.text = "L%d\n🔒 Locked" % level.level_number
-			btn.disabled = true
-			UITheme.apply_ghost_button(btn)
-		_grid.add_child(btn)
+		var card: Control = _make_level_card(level, unlocked, stars, best, i)
+		_grid.add_child(card)
+
+
+func _make_level_card(
+	level: LevelData,
+	unlocked: bool,
+	stars: int,
+	best: int,
+	level_index: int
+) -> Control:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(210, 168)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var style := StyleBoxFlat.new()
+	if unlocked:
+		style.bg_color = Color(0.10, 0.22, 0.14, 0.96)
+		style.border_color = Color(0.95, 0.82, 0.28, 0.75) if stars > 0 else Color(1, 1, 1, 0.28)
+	else:
+		style.bg_color = Color(0.06, 0.1, 0.08, 0.9)
+		style.border_color = Color(1, 1, 1, 0.12)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(20)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 14
+	style.content_margin_bottom = 14
+	style.shadow_color = Color(0, 0, 0, 0.35)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(0, 4)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(vbox)
+
+	var num := Label.new()
+	num.text = "LEVEL %d" % level.level_number
+	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	num.add_theme_font_size_override("font_size", 13)
+	num.add_theme_color_override("font_color", Color(1, 1, 1, 0.55) if unlocked else Color(1, 1, 1, 0.3))
+	vbox.add_child(num)
+
+	var name_l := Label.new()
+	name_l.text = level.display_name
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_l.add_theme_font_size_override("font_size", 20)
+	name_l.add_theme_color_override("font_color", UITheme.CREAM if unlocked else Color(0.7, 0.72, 0.68, 0.55))
+	name_l.add_theme_color_override("font_outline_color", Color(0.04, 0.08, 0.04, 0.7))
+	name_l.add_theme_constant_override("outline_size", 3)
+	vbox.add_child(name_l)
+
+	var star_l := Label.new()
+	star_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	star_l.add_theme_font_size_override("font_size", 22)
+	if unlocked:
+		star_l.text = "★".repeat(stars) + "☆".repeat(maxi(3 - stars, 0))
+		star_l.add_theme_color_override("font_color", UITheme.YOLK if stars > 0 else Color(1, 1, 1, 0.35))
+	else:
+		star_l.text = "🔒"
+		star_l.add_theme_color_override("font_color", Color(0.85, 0.7, 0.35, 0.65))
+	vbox.add_child(star_l)
+
+	var score_l := Label.new()
+	score_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	score_l.add_theme_font_size_override("font_size", 14)
+	if unlocked:
+		score_l.text = "Best  %d" % best if best > 0 else "Not cleared"
+		score_l.add_theme_color_override("font_color", Color(0.9, 0.92, 0.8, 0.75))
+	else:
+		score_l.text = "Locked"
+		score_l.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+	vbox.add_child(score_l)
+
+	if unlocked:
+		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var s_idx: int = _stage_index
+		var l_idx: int = level_index
+		panel.gui_input.connect(func(event: InputEvent) -> void:
+			if event is InputEventMouseButton:
+				var mb := event as InputEventMouseButton
+				if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+					UIFx.punch_button(panel)
+					# Don't emit closed — MainMenu stays hidden while the run loads.
+					visible = false
+					GameManager.start_run(s_idx, l_idx)
+		)
+		# Hover brighten
+		panel.mouse_entered.connect(func() -> void:
+			var hs := style.duplicate() as StyleBoxFlat
+			hs.border_color = UITheme.YOLK_HOT
+			hs.bg_color = Color(0.14, 0.28, 0.18, 0.98)
+			panel.add_theme_stylebox_override("panel", hs)
+		)
+		panel.mouse_exited.connect(func() -> void:
+			panel.add_theme_stylebox_override("panel", style)
+		)
+	else:
+		panel.modulate = Color(0.85, 0.85, 0.85, 0.9)
+
+	return panel

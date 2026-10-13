@@ -1,6 +1,7 @@
-[gd_scene format=3 uid="uid://if3lyod4kj6g"]
+[gd_scene load_steps=3 format=3 uid="uid://blevelselect001"]
 
 [ext_resource type="Script" path="res://scripts/ui/LevelSelectUI.gd" id="1_ls"]
+[ext_resource type="Script" path="res://scripts/ui/MenuAtmosphere.gd" id="2_atmo"]
 
 [node name="LevelSelectUI" type="Control"]
 process_mode = 3
@@ -12,14 +13,26 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_ls")
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="Atmosphere" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.05, 0.12, 0.08, 0.94)
+mouse_filter = 2
+modulate = Color(0.55, 0.65, 0.55, 1)
+script = ExtResource("2_atmo")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.03, 0.08, 0.05, 0.82)
 
 [node name="Safe" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -28,37 +41,64 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 28
-theme_override_constants/margin_right = 28
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 36
 theme_override_constants/margin_bottom = 28
 
 [node name="VBox" type="VBoxContainer" parent="Safe"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 18
 
-[node name="Title" type="Label" parent="Safe/VBox"]
+[node name="Header" type="VBoxContainer" parent="Safe/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Safe/VBox/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
 text = "Campaign"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Safe/VBox/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Pick a stage, then a level"
 horizontal_alignment = 1
 
 [node name="StageTabs" type="HBoxContainer" parent="Safe/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 8
+alignment = 1
+theme_override_constants/separation = 10
 
-[node name="Scroll" type="ScrollContainer" parent="Safe/VBox"]
+[node name="StageHint" type="Label" parent="Safe/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Farmyard Beginner"
+horizontal_alignment = 1
+
+[node name="CenterWrap" type="CenterContainer" parent="Safe/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Grid" type="GridContainer" parent="Safe/VBox/Scroll"]
+[node name="Scroll" type="ScrollContainer" parent="Safe/VBox/CenterWrap"]
+custom_minimum_size = Vector2(980, 360)
 layout_mode = 2
-size_flags_horizontal = 3
-columns = 4
-theme_override_constants/h_separation = 10
-theme_override_constants/v_separation = 10
+horizontal_scroll_mode = 0
 
-[node name="BackButton" type="Button" parent="Safe/VBox"]
-custom_minimum_size = Vector2(0, 52)
+[node name="Grid" type="GridContainer" parent="Safe/VBox/CenterWrap/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+columns = 4
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+
+[node name="Footer" type="HBoxContainer" parent="Safe/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="Safe/VBox/Footer"]
+custom_minimum_size = Vector2(220, 52)
 layout_mode = 2
 text = "Back"
