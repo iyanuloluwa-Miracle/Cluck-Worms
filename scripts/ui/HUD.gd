@@ -1,10 +1,13 @@
 extends CanvasLayer
-## In-run HUD — score, lives, combo, next worm, worm progress, danger. Mobile-safe margins.
+## In-run HUD — score, lives, combo, next worm, worm progress, danger.
+## Gauntlet runs get an ember challenge chrome distinct from Adventure.
 
 @onready var _root: Control = $Root
 @onready var _top_bar: HBoxContainer = $Root/Safe/TopBar
 @onready var _score_chip: PanelContainer = $Root/Safe/TopBar/ScoreChip
 @onready var _score: Label = $Root/Safe/TopBar/ScoreChip/Margin/Score
+@onready var _mode_badge: PanelContainer = $Root/Safe/TopBar/ModeBadge if has_node("Root/Safe/TopBar/ModeBadge") else null
+@onready var _mode_label: Label = $Root/Safe/TopBar/ModeBadge/Margin/ModeLabel if has_node("Root/Safe/TopBar/ModeBadge/Margin/ModeLabel") else null
 @onready var _lives_chip: PanelContainer = $Root/Safe/TopBar/LivesChip
 @onready var _lives: Label = $Root/Safe/TopBar/LivesChip/Margin/Lives
 @onready var _pause_btn: Button = $Root/Safe/TopBar/PauseButton
@@ -17,21 +20,25 @@ extends CanvasLayer
 @onready var _progress_bar: ProgressBar = $Root/Safe/ProgressBar if has_node("Root/Safe/ProgressBar") else null
 @onready var _gauntlet_banner: Label = $Root/Safe/GauntletBanner if has_node("Root/Safe/GauntletBanner") else null
 
-## Worm progress tracking.
+const EMBER := Color(0.72, 0.28, 0.08)
+const EMBER_HOT := Color(1.0, 0.55, 0.12)
+const EMBER_EDGE := Color(1.0, 0.82, 0.28)
+const EMBER_CHIP := Color(0.12, 0.06, 0.03, 0.92)
+const MEADOW_CHIP := Color(0.06, 0.12, 0.08, 0.88)
+
 var _total_worms: int = 0
 var _worms_cleared: int = 0
-
-## Danger animation.
 var _danger_urgency: float = 0.0
 var _danger_pulse: float = 0.0
 var _pending_gauntlet_banner: bool = false
 var _gauntlet_banner_tween: Tween
+var _gauntlet_themed: bool = false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
-	_style()
+	_style_adventure()
 	_pause_btn.pressed.connect(_on_pause)
 	EventBus.score_changed.connect(_on_score)
 	EventBus.combo_changed.connect(_on_combo)
@@ -49,58 +56,179 @@ func _ready() -> void:
 	if _gauntlet_banner:
 		_gauntlet_banner.visible = false
 		UITheme.apply_font(_gauntlet_banner, UITheme.WEIGHT_BOLD)
-		_gauntlet_banner.add_theme_font_size_override("font_size", 48)
-		_gauntlet_banner.add_theme_color_override("font_color", Color(1.0, 0.82, 0.28, 1.0))
-		_gauntlet_banner.add_theme_color_override("font_outline_color", Color(0.35, 0.1, 0.02, 0.95))
-		_gauntlet_banner.add_theme_constant_override("outline_size", 10)
+		_gauntlet_banner.add_theme_font_size_override("font_size", 56)
+		_gauntlet_banner.add_theme_color_override("font_color", Color(1.0, 0.86, 0.32, 1.0))
+		_gauntlet_banner.add_theme_color_override("font_outline_color", Color(0.35, 0.08, 0.02, 0.95))
+		_gauntlet_banner.add_theme_constant_override("outline_size", 12)
 		_gauntlet_banner.text = "GAUNTLET"
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _danger_urgency > 0.0:
 		_danger_pulse = sin(Time.get_ticks_msec() * 0.008) * 0.5 + 0.5
 		var danger_alpha: float = 0.15 + _danger_urgency * 0.55 + _danger_pulse * _danger_urgency * 0.30
 		_status.modulate.a = danger_alpha
-		if _progress_bar:
-			_progress_bar.queue_redraw()
 
 
-func _style() -> void:
-	var chip := UITheme.chip_style(Color(0.06, 0.12, 0.08, 0.88))
+func _apply_run_theme() -> void:
+	if GameManager.is_gauntlet_run:
+		_style_gauntlet()
+	else:
+		_style_adventure()
+
+
+func _chip(fill: Color, edge: Color, radius: int = 14) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = fill
+	s.border_color = edge
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(radius)
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 8
+	s.content_margin_bottom = 8
+	s.shadow_color = Color(0, 0, 0, 0.35)
+	s.shadow_size = 6
+	s.shadow_offset = Vector2(0, 3)
+	return s
+
+
+func _style_adventure() -> void:
+	_gauntlet_themed = false
+	if _mode_badge:
+		_mode_badge.visible = false
+	var chip := _chip(MEADOW_CHIP, Color(0.35, 0.55, 0.38, 0.55))
 	_score_chip.add_theme_stylebox_override("panel", chip)
-	_lives_chip.add_theme_stylebox_override("panel", chip)
-	_next_chip.add_theme_stylebox_override(
-		"panel", UITheme.chip_style(Color(0.08, 0.14, 0.10, 0.92))
-	)
-	UITheme.style_body(_score, 20, false)
+	_lives_chip.add_theme_stylebox_override("panel", chip.duplicate())
+	_next_chip.add_theme_stylebox_override("panel", _chip(Color(0.08, 0.14, 0.10, 0.92), Color(0.35, 0.55, 0.38, 0.45)))
+	UITheme.apply_font(_score, UITheme.WEIGHT_BOLD)
+	_score.add_theme_font_size_override("font_size", 22)
 	_score.add_theme_color_override("font_color", UITheme.YOLK_HOT)
-	UITheme.style_body(_lives, 18, false)
+	_score.add_theme_constant_override("outline_size", 3)
+	UITheme.apply_font(_lives, UITheme.WEIGHT_BOLD)
+	_lives.add_theme_font_size_override("font_size", 18)
 	_lives.add_theme_color_override("font_color", Color(1.0, 0.68, 0.65))
-	UITheme.style_body(_level, 13, true)
+	UITheme.apply_font(_level, UITheme.WEIGHT_SEMIBOLD)
+	_level.add_theme_font_size_override("font_size", 14)
+	_level.add_theme_color_override("font_color", UITheme.CREAM_DIM)
 	_level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.style_body(_combo, 19, false)
+	UITheme.apply_font(_combo, UITheme.WEIGHT_BOLD)
+	_combo.add_theme_font_size_override("font_size", 20)
 	_combo.add_theme_color_override("font_color", UITheme.YOLK)
 	_combo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.style_body(_status, 15, true)
+	UITheme.apply_font(_status, UITheme.WEIGHT_SEMIBOLD)
+	_status.add_theme_font_size_override("font_size", 15)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.add_theme_color_override("font_color", UITheme.DANGER)
-	UITheme.style_body(_next_label, 13, true)
+	UITheme.apply_font(_next_label, UITheme.WEIGHT_BOLD)
+	_next_label.add_theme_font_size_override("font_size", 13)
+	_next_label.add_theme_color_override("font_color", UITheme.CREAM_DIM)
 	_next_label.text = "NEXT"
 	UITheme.apply_ghost_button(_pause_btn)
 	_pause_btn.text = "Ⅱ"
 	_pause_btn.custom_minimum_size = Vector2(UITheme.TOUCH_MIN, UITheme.TOUCH_MIN)
 	_pause_btn.add_theme_font_size_override("font_size", 22)
+	_style_progress(UITheme.YOLK_HOT, Color(0.04, 0.08, 0.05, 0.75))
 
+
+func _style_gauntlet() -> void:
+	_gauntlet_themed = true
+	var chip := _chip(EMBER_CHIP, EMBER_EDGE, 16)
+	chip.set_border_width_all(3)
+	chip.shadow_color = Color(1.0, 0.35, 0.05, 0.4)
+	chip.shadow_size = 10
+	_score_chip.add_theme_stylebox_override("panel", chip)
+	_lives_chip.add_theme_stylebox_override("panel", chip.duplicate())
+	var next := _chip(Color(0.14, 0.06, 0.02, 0.94), EMBER_HOT, 16)
+	next.set_border_width_all(3)
+	_next_chip.add_theme_stylebox_override("panel", next)
+
+	if _mode_badge and _mode_label:
+		_mode_badge.visible = true
+		var badge := _chip(EMBER, EMBER_EDGE, 12)
+		badge.set_border_width_all(3)
+		badge.shadow_color = Color(1.0, 0.4, 0.05, 0.5)
+		badge.shadow_size = 8
+		_mode_badge.add_theme_stylebox_override("panel", badge)
+		UITheme.apply_font(_mode_label, UITheme.WEIGHT_BOLD)
+		_mode_label.text = "GAUNTLET"
+		_mode_label.add_theme_font_size_override("font_size", 14)
+		_mode_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.55, 1.0))
+		_mode_label.add_theme_color_override("font_outline_color", Color(0.2, 0.05, 0.0, 0.9))
+		_mode_label.add_theme_constant_override("outline_size", 3)
+
+	UITheme.apply_font(_score, UITheme.WEIGHT_BOLD)
+	_score.add_theme_font_size_override("font_size", 26)
+	_score.add_theme_color_override("font_color", Color(1.0, 0.92, 0.4, 1.0))
+	_score.add_theme_color_override("font_outline_color", Color(0.25, 0.08, 0.02, 0.95))
+	_score.add_theme_constant_override("outline_size", 5)
+
+	UITheme.apply_font(_lives, UITheme.WEIGHT_BOLD)
+	_lives.add_theme_font_size_override("font_size", 20)
+	_lives.add_theme_color_override("font_color", Color(1.0, 0.55, 0.45, 1.0))
+
+	UITheme.apply_font(_level, UITheme.WEIGHT_BOLD)
+	_level.add_theme_font_size_override("font_size", 15)
+	_level.add_theme_color_override("font_color", Color(1.0, 0.82, 0.45, 0.95))
+	_level.add_theme_color_override("font_outline_color", Color(0.15, 0.05, 0.02, 0.8))
+	_level.add_theme_constant_override("outline_size", 3)
+	_level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	UITheme.apply_font(_combo, UITheme.WEIGHT_BOLD)
+	_combo.add_theme_font_size_override("font_size", 22)
+	_combo.add_theme_color_override("font_color", EMBER_HOT)
+	_combo.add_theme_constant_override("outline_size", 4)
+	_combo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	UITheme.apply_font(_status, UITheme.WEIGHT_BOLD)
+	_status.add_theme_font_size_override("font_size", 17)
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status.add_theme_color_override("font_color", Color(1.0, 0.45, 0.25, 1.0))
+
+	UITheme.apply_font(_next_label, UITheme.WEIGHT_BOLD)
+	_next_label.add_theme_font_size_override("font_size", 14)
+	_next_label.add_theme_color_override("font_color", EMBER_EDGE)
+	_next_label.text = "NEXT"
+
+	# Ember pause button
+	var pause_n := StyleBoxFlat.new()
+	pause_n.bg_color = EMBER
+	pause_n.border_color = EMBER_EDGE
+	pause_n.set_border_width_all(3)
+	pause_n.set_corner_radius_all(14)
+	pause_n.shadow_color = Color(1.0, 0.35, 0.05, 0.4)
+	pause_n.shadow_size = 8
+	var pause_h := pause_n.duplicate() as StyleBoxFlat
+	pause_h.bg_color = EMBER_HOT
+	_pause_btn.add_theme_stylebox_override("normal", pause_n)
+	_pause_btn.add_theme_stylebox_override("hover", pause_h)
+	_pause_btn.add_theme_stylebox_override("pressed", pause_h)
+	_pause_btn.add_theme_stylebox_override("focus", pause_h)
+	UITheme.apply_font(_pause_btn, UITheme.WEIGHT_BOLD)
+	_pause_btn.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7, 1.0))
+	_pause_btn.text = "Ⅱ"
+	_pause_btn.custom_minimum_size = Vector2(UITheme.TOUCH_MIN, UITheme.TOUCH_MIN)
+	_pause_btn.add_theme_font_size_override("font_size", 22)
+
+	_style_progress(EMBER_HOT, Color(0.12, 0.05, 0.02, 0.85))
 	if _progress_bar:
-		_progress_bar.show_percentage = false
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.04, 0.08, 0.05, 0.75)
-		bg.set_corner_radius_all(4)
-		_progress_bar.add_theme_stylebox_override("background", bg)
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = UITheme.YOLK_HOT
-		fill.set_corner_radius_all(4)
-		_progress_bar.add_theme_stylebox_override("fill", fill)
+		_progress_bar.custom_minimum_size = Vector2(320, 12)
+
+
+func _style_progress(fill_col: Color, bg_col: Color) -> void:
+	if _progress_bar == null:
+		return
+	_progress_bar.show_percentage = false
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = bg_col
+	bg.set_corner_radius_all(6)
+	bg.set_border_width_all(1)
+	bg.border_color = Color(fill_col.r, fill_col.g, fill_col.b, 0.35)
+	_progress_bar.add_theme_stylebox_override("background", bg)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = fill_col
+	fill.set_corner_radius_all(6)
+	_progress_bar.add_theme_stylebox_override("fill", fill)
 
 
 func _on_state(_prev: int, next: int) -> void:
@@ -109,15 +237,17 @@ func _on_state(_prev: int, next: int) -> void:
 		or next == GameManager.State.PAUSED
 	)
 	if show and not visible:
+		_apply_run_theme()
 		visible = true
 		_root.modulate.a = 0.0
 		UIFx.fade_in(_root, 0.28)
-		if _pending_gauntlet_banner:
+		if _pending_gauntlet_banner or GameManager.is_gauntlet_run:
 			_pending_gauntlet_banner = false
 			call_deferred("_show_gauntlet_banner")
 	elif not show:
 		visible = false
 		_hide_gauntlet_banner_immediate()
+		_gauntlet_themed = false
 
 
 func _on_gauntlet_run_started() -> void:
@@ -125,20 +255,21 @@ func _on_gauntlet_run_started() -> void:
 
 
 func _show_gauntlet_banner() -> void:
-	if _gauntlet_banner == null or not visible:
+	if _gauntlet_banner == null or not visible or not GameManager.is_gauntlet_run:
 		return
 	if _gauntlet_banner_tween != null:
 		_gauntlet_banner_tween.kill()
 	_gauntlet_banner.visible = true
 	_gauntlet_banner.modulate.a = 0.0
-	_gauntlet_banner.scale = Vector2(0.7, 0.7)
+	_gauntlet_banner.scale = Vector2(0.55, 0.55)
 	_gauntlet_banner.pivot_offset = _gauntlet_banner.size * 0.5
 	_gauntlet_banner_tween = create_tween()
 	_gauntlet_banner_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 1.0, 0.22)
-	_gauntlet_banner_tween.parallel().tween_property(_gauntlet_banner, "scale", Vector2.ONE, 0.28)
-	_gauntlet_banner_tween.tween_interval(1.15)
-	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 0.0, 0.35)
+	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 1.0, 0.2)
+	_gauntlet_banner_tween.parallel().tween_property(_gauntlet_banner, "scale", Vector2(1.08, 1.08), 0.28)
+	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "scale", Vector2.ONE, 0.12)
+	_gauntlet_banner_tween.tween_interval(1.0)
+	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 0.0, 0.4)
 	_gauntlet_banner_tween.tween_callback(func() -> void:
 		if _gauntlet_banner:
 			_gauntlet_banner.visible = false
@@ -181,14 +312,17 @@ func _on_combo(combo: int) -> void:
 	else:
 		_combo.modulate.a = 1.0
 		var mul: float = GameManager.get_combo_multiplier()
-		if combo == 1:
+		if GameManager.is_gauntlet_run:
+			_combo.text = "⚔ COMBO ×%d  (%.1fx)" % [maxi(combo, 1), mul] if combo > 1 else "⚔ COMBO ×1"
+		elif combo == 1:
 			_combo.text = "COMBO ×1"
 		else:
 			_combo.text = "COMBO ×%d  (%.1fx)" % [combo, mul]
-		# Color ramp: green → yellow → orange → red.
 		var ramp_t: float = clampf(float(combo - 1) / 9.0, 0.0, 1.0)
 		var combo_color: Color
-		if ramp_t < 0.33:
+		if GameManager.is_gauntlet_run:
+			combo_color = Color(1.0, 0.85, 0.35).lerp(Color(1.0, 0.35, 0.1), ramp_t)
+		elif ramp_t < 0.33:
 			combo_color = UITheme.SUCCESS.lerp(UITheme.YOLK, ramp_t * 3.0)
 		elif ramp_t < 0.66:
 			combo_color = UITheme.YOLK.lerp(Color(1.0, 0.55, 0.15), (ramp_t - 0.33) * 3.0)
@@ -206,6 +340,7 @@ func _on_lives(lives: int, max_lives: int) -> void:
 
 
 func _on_level_started(_id: StringName, display_name: String) -> void:
+	_apply_run_theme()
 	var stage: StageDef = GameManager.get_current_stage()
 	var stage_name: String = stage.display_name if stage else "Stage"
 	var num: int = 0
@@ -215,7 +350,12 @@ func _on_level_started(_id: StringName, display_name: String) -> void:
 	else:
 		_total_worms = 0
 	_worms_cleared = 0
-	if num > 0:
+	if GameManager.is_gauntlet_run:
+		if num > 0:
+			_level.text = "GAUNTLET  ·  L%d  %s" % [num, display_name]
+		else:
+			_level.text = "GAUNTLET  ·  %s" % display_name
+	elif num > 0:
 		_level.text = "%s  ·  L%d  %s" % [stage_name, num, display_name]
 	else:
 		_level.text = "%s  ·  %s" % [stage_name, display_name]
@@ -247,12 +387,12 @@ func _on_cascade(_chain: WormChain, depth: int, count: int, color: WormColor.Kin
 		_status.text = "%s ×%d" % [WormColor.kind_name(color), count]
 	else:
 		_status.text = "✦ CASCADE %d!  %s ×%d" % [depth + 1, WormColor.kind_name(color), count]
-	_status.add_theme_color_override("font_color",
-		UITheme.YOLK_HOT if depth >= 1 else UITheme.SUCCESS
+	_status.add_theme_color_override(
+		"font_color",
+		EMBER_HOT if GameManager.is_gauntlet_run else (UITheme.YOLK_HOT if depth >= 1 else UITheme.SUCCESS)
 	)
 	_status.modulate.a = 1.0
 	UIFx.pulse_label(_status)
-	# Fade status after a brief display.
 	var tween := create_tween()
 	tween.tween_interval(1.8)
 	tween.tween_property(_status, "modulate:a", 0.0, 0.5)
@@ -283,7 +423,7 @@ func _on_danger(urgency: float) -> void:
 		return
 	var msg: String
 	if urgency > 0.75:
-		msg = "⚠ DANGER!"
+		msg = "⚠ DANGER!" if not GameManager.is_gauntlet_run else "⚠ GAUNTLET BREAKING!"
 	elif urgency > 0.45:
 		msg = "Chain approaching…"
 	else:

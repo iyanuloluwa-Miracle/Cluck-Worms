@@ -60,6 +60,8 @@ var _state_before_pause: State = State.PLAYING
 var cascades_this_level: int = 0
 var last_level_stars: int = 0
 var level_start_score: int = 0
+## True when the current run was started from the Gauntlet menu (arcade feel).
+var is_gauntlet_run: bool = false
 
 
 func _ready() -> void:
@@ -170,14 +172,16 @@ func go_to_main_menu() -> void:
 		_submit_high_score()
 	_set_tree_paused(false)
 	is_paused = false
+	is_gauntlet_run = false
 	_change_state(State.MAIN_MENU)
 	EventBus.unload_level_requested.emit()
 
 
-func start_run(from_stage: int = 0, from_level: int = 0) -> void:
+func start_run(from_stage: int = 0, from_level: int = 0, gauntlet: bool = false) -> void:
 	if catalog == null or catalog.get_stage_count() == 0:
 		push_error("GameManager: no progression catalog.")
 		return
+	is_gauntlet_run = gauntlet
 	stage_index = clampi(from_stage, 0, catalog.get_stage_count() - 1)
 	var stage: StageDef = catalog.get_stage(stage_index)
 	level_index = clampi(from_level, 0, maxi(stage.get_level_count() - 1, 0))
@@ -190,6 +194,8 @@ func start_run(from_stage: int = 0, from_level: int = 0) -> void:
 	EventBus.lives_changed.emit(lives, starting_lives)
 	EventBus.high_score_changed.emit(SaveService.high_score, false)
 	EventBus.run_started.emit(stage_index, level_index)
+	if gauntlet:
+		EventBus.gauntlet_run_started.emit()
 	_load_current_level()
 
 

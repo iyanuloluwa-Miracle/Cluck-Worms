@@ -469,7 +469,6 @@ func _on_adventure() -> void:
 
 func _on_gauntlet() -> void:
 	UIFx.punch_button(_gauntlet_btn)
-	EventBus.gauntlet_run_started.emit()
 	# Jump into the highest unlocked level — arcade-style gauntlet run.
 	var unlocked: int = SaveService.max_level_unlocked
 	var stage_i: int = 0
@@ -482,7 +481,7 @@ func _on_gauntlet() -> void:
 				if ld.level_number <= unlocked:
 					stage_i = s
 					level_i = l
-	GameManager.start_run(stage_i, level_i)
+	GameManager.start_run(stage_i, level_i, true)
 
 
 func _on_campaign_closed() -> void:
