@@ -1,6 +1,6 @@
 [gd_resource type="Theme" load_steps=2 format=3]
 
-[ext_resource type="FontFile" uid="uid://cqfredokaui001" path="res://fonts/Fredoka-Variable.ttf" id="1_fredoka"]
+[ext_resource type="FontVariation" path="res://resources/ui/FredokaMedium.tres" id="1_fredoka"]
 
 [resource]
 default_font = ExtResource("1_fredoka")

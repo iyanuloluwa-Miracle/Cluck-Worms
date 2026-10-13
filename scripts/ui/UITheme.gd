@@ -3,9 +3,13 @@ extends RefCounted
 ## Design tokens for Cluck & Worms — meadow + yolk, high readability.
 ## Mobile-first: large touch targets, generous margins, strong contrast.
 
-# --- Typography ---
+# --- Typography (Fredoka variable: 300–700) ---
 const FONT_PATH := "res://fonts/Fredoka-Variable.ttf"
-static var _font: Font
+const WEIGHT_REGULAR := 500
+const WEIGHT_SEMIBOLD := 600
+const WEIGHT_BOLD := 700
+static var _base_font: Font
+static var _font_cache: Dictionary = {}  # weight -> Font
 
 # --- Palette ---
 const MEADOW_DEEP := Color(0.07, 0.16, 0.11)
@@ -33,14 +37,32 @@ const CAPTION_SIZE := 14
 const BUTTON_FONT := 20
 
 
-static func font() -> Font:
-	if _font == null:
-		_font = load(FONT_PATH) as Font
-	return _font
+static func font(weight: int = WEIGHT_REGULAR) -> Font:
+	weight = clampi(weight, 300, 700)
+	if _font_cache.has(weight):
+		return _font_cache[weight] as Font
+	if _base_font == null:
+		_base_font = load(FONT_PATH) as Font
+	if _base_font == null:
+		return null
+	var variation := FontVariation.new()
+	variation.base_font = _base_font
+	var ts := TextServerManager.get_primary_interface()
+	variation.variation_opentype = {ts.name_to_tag("wght"): float(weight)}
+	_font_cache[weight] = variation
+	return variation
 
 
-static func apply_font(control: Control) -> void:
-	var f := font()
+static func font_bold() -> Font:
+	return font(WEIGHT_BOLD)
+
+
+static func font_semibold() -> Font:
+	return font(WEIGHT_SEMIBOLD)
+
+
+static func apply_font(control: Control, weight: int = WEIGHT_REGULAR) -> void:
+	var f := font(weight)
 	if f == null or control == null:
 		return
 	control.add_theme_font_override("font", f)
@@ -120,7 +142,7 @@ static func button_ghost() -> StyleBoxFlat:
 
 
 static func apply_primary_button(btn: Button) -> void:
-	apply_font(btn)
+	apply_font(btn, WEIGHT_BOLD)
 	btn.add_theme_stylebox_override("normal", button_normal())
 	btn.add_theme_stylebox_override("hover", button_hover())
 	btn.add_theme_stylebox_override("pressed", button_pressed())
@@ -133,7 +155,7 @@ static func apply_primary_button(btn: Button) -> void:
 
 
 static func apply_ghost_button(btn: Button) -> void:
-	apply_font(btn)
+	apply_font(btn, WEIGHT_SEMIBOLD)
 	var ghost := button_ghost()
 	btn.add_theme_stylebox_override("normal", ghost)
 	btn.add_theme_stylebox_override("hover", ghost)
@@ -147,14 +169,14 @@ static func apply_ghost_button(btn: Button) -> void:
 
 
 static func style_title(label: Label, size: int = TITLE_SIZE) -> void:
-	apply_font(label)
+	apply_font(label, WEIGHT_BOLD)
 	label.add_theme_color_override("font_color", YOLK)
 	label.add_theme_font_size_override("font_size", size)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 static func style_body(label: Label, size: int = BODY_SIZE, dim: bool = false) -> void:
-	apply_font(label)
+	apply_font(label, WEIGHT_REGULAR)
 	label.add_theme_color_override("font_color", CREAM_DIM if dim else CREAM)
 	label.add_theme_font_size_override("font_size", size)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

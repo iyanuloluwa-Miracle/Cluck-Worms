@@ -13,7 +13,7 @@ func setup(text: String, color: Color, lifetime: float = 0.7) -> void:
 	_label = Label.new()
 	_label.text = text
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_font(_label)
+	UITheme.apply_font(_label, UITheme.WEIGHT_BOLD)
 	_label.add_theme_font_size_override("font_size", 22)
 	_label.add_theme_color_override("font_color", color)
 	_label.position = Vector2(-60, -12)

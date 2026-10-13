@@ -17,8 +17,17 @@ extends Control
 @onready var _campaign_btn: Button = $SafeArea/Root/CTA/SecondaryRow/CampaignButton
 @onready var _settings_btn: Button = $SafeArea/Root/CTA/SecondaryRow/SettingsButton
 @onready var _quit_btn: Button = $SafeArea/Root/CTA/QuitButton
-@onready var _welcome_label: Label = $SafeArea/Root/BrandBlock/GreetingRow/WelcomeLabel if has_node("SafeArea/Root/BrandBlock/GreetingRow/WelcomeLabel") else null
-@onready var _switch_btn: Button = $SafeArea/Root/BrandBlock/GreetingRow/SwitchPlayerButton if has_node("SafeArea/Root/BrandBlock/GreetingRow/SwitchPlayerButton") else null
+@onready var _greeting_plaque: PanelContainer = $SafeArea/Root/BrandBlock/GreetingPlaque if has_node("SafeArea/Root/BrandBlock/GreetingPlaque") else null
+@onready var _welcome_label: Label = (
+	$SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol/WelcomeLabel
+	if has_node("SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol/WelcomeLabel")
+	else null
+)
+@onready var _switch_btn: Button = (
+	$SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol/SwitchPlayerButton
+	if has_node("SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol/SwitchPlayerButton")
+	else null
+)
 @onready var _profile_dialog: Control = $PlayerProfileUI if has_node("PlayerProfileUI") else null
 
 var _play_pulse: Tween
@@ -45,25 +54,38 @@ func _ready() -> void:
 
 
 func _style() -> void:
-	# Hero title — big yolk type with deep meadow outline.
+	if _greeting_plaque:
+		var plaque := UITheme.chip_style(Color(0.08, 0.16, 0.11, 0.82))
+		plaque.border_color = Color(1.0, 0.88, 0.35, 0.22)
+		plaque.set_border_width_all(2)
+		plaque.content_margin_left = 0
+		plaque.content_margin_right = 0
+		plaque.content_margin_top = 0
+		plaque.content_margin_bottom = 0
+		_greeting_plaque.add_theme_stylebox_override("panel", plaque)
+
+	# Hero title — thick Fredoka Bold with deep meadow outline.
 	_title.text = "Cluck & Worms"
-	_title.add_theme_font_size_override("font_size", 68)
+	UITheme.apply_font(_title, UITheme.WEIGHT_BOLD)
+	_title.add_theme_font_size_override("font_size", 72)
 	_title.add_theme_color_override("font_color", UITheme.YOLK_HOT)
 	_title.add_theme_color_override("font_outline_color", Color(0.08, 0.18, 0.10, 0.92))
-	_title.add_theme_constant_override("outline_size", 14)
+	_title.add_theme_constant_override("outline_size", 16)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_tagline.text = "Aim. Match. Cascade."
-	_tagline.add_theme_font_size_override("font_size", 20)
-	_tagline.add_theme_color_override("font_color", Color(0.98, 0.97, 0.9, 0.92))
-	_tagline.add_theme_color_override("font_outline_color", Color(0.05, 0.12, 0.07, 0.65))
-	_tagline.add_theme_constant_override("outline_size", 4)
+	UITheme.apply_font(_tagline, UITheme.WEIGHT_SEMIBOLD)
+	_tagline.add_theme_font_size_override("font_size", 22)
+	_tagline.add_theme_color_override("font_color", Color(0.98, 0.97, 0.9, 0.95))
+	_tagline.add_theme_color_override("font_outline_color", Color(0.05, 0.12, 0.07, 0.7))
+	_tagline.add_theme_constant_override("outline_size", 5)
 	_tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	_high_score.add_theme_font_size_override("font_size", 16)
-	_high_score.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45, 0.9))
-	_high_score.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.55))
-	_high_score.add_theme_constant_override("outline_size", 3)
+	UITheme.apply_font(_high_score, UITheme.WEIGHT_BOLD)
+	_high_score.add_theme_font_size_override("font_size", 18)
+	_high_score.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45, 0.95))
+	_high_score.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.6))
+	_high_score.add_theme_constant_override("outline_size", 4)
 	_high_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var board_style := UITheme.panel_style(Color(0.06, 0.14, 0.09, 0.72), Color(1.0, 0.88, 0.35, 0.28), 16.0)
@@ -77,12 +99,14 @@ func _style() -> void:
 	_leaderboard.add_theme_stylebox_override("panel", board_style)
 
 	_board_header.text = "LEADERBOARD"
-	_board_header.add_theme_font_size_override("font_size", 15)
+	UITheme.apply_font(_board_header, UITheme.WEIGHT_BOLD)
+	_board_header.add_theme_font_size_override("font_size", 16)
 	_board_header.add_theme_color_override("font_color", UITheme.YOLK_HOT)
 	_board_header.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.7))
 	_board_header.add_theme_constant_override("outline_size", 3)
 	_board_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
+	UITheme.apply_font(_board_empty, UITheme.WEIGHT_SEMIBOLD)
 	_board_empty.add_theme_font_size_override("font_size", 13)
 	_board_empty.add_theme_color_override("font_color", Color(0.92, 0.95, 0.88, 0.65))
 	_board_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -90,7 +114,8 @@ func _style() -> void:
 
 	UITheme.apply_primary_button(_play_btn)
 	_play_btn.text = "PLAY"
-	_play_btn.add_theme_font_size_override("font_size", 26)
+	UITheme.apply_font(_play_btn, UITheme.WEIGHT_BOLD)
+	_play_btn.add_theme_font_size_override("font_size", 28)
 	_play_btn.custom_minimum_size = Vector2(0, 68)
 
 	# Juicier primary button.
@@ -112,8 +137,12 @@ func _style() -> void:
 
 	UITheme.apply_ghost_button(_campaign_btn)
 	_campaign_btn.text = "Campaign"
+	UITheme.apply_font(_campaign_btn, UITheme.WEIGHT_BOLD)
+	_campaign_btn.add_theme_font_size_override("font_size", 20)
 	UITheme.apply_ghost_button(_settings_btn)
 	_settings_btn.text = "Settings"
+	UITheme.apply_font(_settings_btn, UITheme.WEIGHT_BOLD)
+	_settings_btn.add_theme_font_size_override("font_size", 20)
 
 	# Quit as quiet text action — not competing with Play.
 	var quit_style := StyleBoxEmpty.new()
@@ -121,6 +150,7 @@ func _style() -> void:
 	_quit_btn.add_theme_stylebox_override("hover", quit_style)
 	_quit_btn.add_theme_stylebox_override("pressed", quit_style)
 	_quit_btn.add_theme_stylebox_override("focus", quit_style)
+	UITheme.apply_font(_quit_btn, UITheme.WEIGHT_SEMIBOLD)
 	_quit_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
 	_quit_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
 	_quit_btn.add_theme_font_size_override("font_size", 16)
@@ -130,15 +160,17 @@ func _style() -> void:
 
 func _refresh_greeting() -> void:
 	if _welcome_label:
-		_welcome_label.text = "WELCOME TO CLUCK & WORMS!"
-		_welcome_label.add_theme_font_size_override("font_size", 16)
-		_welcome_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.65, 0.95))
+		_welcome_label.text = "★ WELCOME TO CLUCK & WORMS! ★"
+		UITheme.apply_font(_welcome_label, UITheme.WEIGHT_BOLD)
+		_welcome_label.add_theme_font_size_override("font_size", 18)
+		_welcome_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.65, 0.98))
 		_welcome_label.add_theme_color_override("font_outline_color", Color(0.06, 0.14, 0.07, 0.85))
 		_welcome_label.add_theme_constant_override("outline_size", 4)
 	if _switch_btn:
-		_switch_btn.text = "(If you are not %s, click here)" % SaveService.current_player_name
-		_switch_btn.add_theme_font_size_override("font_size", 13)
-		_switch_btn.add_theme_color_override("font_color", Color(0.85, 0.92, 0.82, 0.80))
+		_switch_btn.text = "(If you are not %s, click here to switch)" % SaveService.current_player_name
+		UITheme.apply_font(_switch_btn, UITheme.WEIGHT_SEMIBOLD)
+		_switch_btn.add_theme_font_size_override("font_size", 14)
+		_switch_btn.add_theme_color_override("font_color", Color(0.85, 0.92, 0.82, 0.85))
 		_switch_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
 
 
@@ -170,6 +202,7 @@ func _refresh_leaderboard() -> void:
 		var rank := Label.new()
 		rank.custom_minimum_size = Vector2(28, 0)
 		rank.text = "#%d" % (i + 1)
+		UITheme.apply_font(rank, UITheme.WEIGHT_BOLD)
 		rank.add_theme_font_size_override("font_size", 14)
 		rank.add_theme_color_override("font_color", _rank_color(i))
 		rank.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.55))
@@ -177,10 +210,12 @@ func _refresh_leaderboard() -> void:
 		var name_l := Label.new()
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.text = String(entry.get("name", "You"))
+		UITheme.apply_font(name_l, UITheme.WEIGHT_SEMIBOLD)
 		name_l.add_theme_font_size_override("font_size", 14)
 		name_l.add_theme_color_override("font_color", Color(0.96, 0.97, 0.92, 0.92))
 		var score_l := Label.new()
 		score_l.text = _format_score(int(entry.get("score", 0)))
+		UITheme.apply_font(score_l, UITheme.WEIGHT_BOLD)
 		score_l.add_theme_font_size_override("font_size", 14)
 		score_l.add_theme_color_override("font_color", UITheme.YOLK if i == 0 else Color(1.0, 0.92, 0.55, 0.88))
 		score_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

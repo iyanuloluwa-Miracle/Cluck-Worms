@@ -49,21 +49,32 @@ offset_right = 320.0
 offset_bottom = 220.0
 grow_horizontal = 2
 theme_override_constants/separation = 6
-[node name="GreetingRow" type="VBoxContainer" parent="SafeArea/Root/BrandBlock"]
+[node name="GreetingPlaque" type="PanelContainer" parent="SafeArea/Root/BrandBlock"]
 layout_mode = 2
-theme_override_constants/separation = 1
+size_flags_horizontal = 4
 
-[node name="WelcomeLabel" type="Label" parent="SafeArea/Root/BrandBlock/GreetingRow"]
+[node name="Margin" type="MarginContainer" parent="SafeArea/Root/BrandBlock/GreetingPlaque"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "WELCOME TO CLUCK & WORMS!"
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 8
+
+[node name="GreetingCol" type="VBoxContainer" parent="SafeArea/Root/BrandBlock/GreetingPlaque/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="WelcomeLabel" type="Label" parent="SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "★ WELCOME TO CLUCK & WORMS! ★"
 horizontal_alignment = 1
 
-[node name="SwitchPlayerButton" type="Button" parent="SafeArea/Root/BrandBlock/GreetingRow"]
+[node name="SwitchPlayerButton" type="Button" parent="SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol"]
+custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
-flat = true
-text = "(IF THIS IS NOT YOU, CLICK HERE.)"
+theme_override_font_sizes/font_size = 14
+text = "(If you are not Farmer Cluck, click here to switch)"
 
 [node name="Title" type="Label" parent="SafeArea/Root/BrandBlock"]
 layout_mode = 2
