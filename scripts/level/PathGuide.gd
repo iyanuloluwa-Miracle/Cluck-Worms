@@ -1,7 +1,7 @@
 extends Node2D
 ## 10x Zuma-style carved physical track guide.
 ## Renders a multi-layered recessed trench carved into the terrain, dual guide rails,
-## animated marching directional pearls, an earthen entry burrow, and a menacing hazard pit.
+## animated marching directional pearls, an earthen entry burrow, and a woven farmyard nest.
 
 @export var path: Path2D
 @export var sample_step: float = 6.0
@@ -153,9 +153,9 @@ func _draw() -> void:
 	_draw_start_burrow(curve)
 
 	# =========================================================================
-	# 8. LAYER 8: End Landmark (Menacing Hazard Pit / Abyss)
+	# 8. LAYER 8: End Landmark (Farmyard Nest — protect it!)
 	# =========================================================================
-	_draw_hazard_pit(curve, length)
+	_draw_nest(curve, length)
 
 
 func _draw_marching_pearls(curve: Curve2D, length: float) -> void:
@@ -254,46 +254,106 @@ func _draw_start_burrow(curve: Curve2D) -> void:
 	draw_circle(pt, 1.5, Color(0.95, 1.0, 0.95, 1.0))
 
 
-func _draw_hazard_pit(curve: Curve2D, length: float) -> void:
+func _draw_nest(curve: Curve2D, length: float) -> void:
 	var end_xf: Transform2D = curve.sample_baked_with_rotation(length, false)
 	var pt: Vector2 = _path_to_local(end_xf.origin)
-
 	var urgency: float = _danger_urgency
 	var pulse: float = _danger_pulse
+	var breathe: float = 1.0 + sin(_anim_time * 2.2) * 0.02
 
-	# Dynamic outer pulsing danger flare.
-	var flare_radius: float = 28.0 + urgency * 8.0 + pulse * urgency * 4.0
-	var flare_alpha: float = 0.28 + urgency * 0.40 + pulse * urgency * 0.30
-	draw_circle(pt, flare_radius, Color(0.95, 0.15, 0.10, flare_alpha * 0.45))
+	# Soft ground contact shadow.
+	_fill_ellipse(pt + Vector2(2, 10), Vector2(34 * breathe, 14), Color(0, 0, 0, 0.38))
 
-	# Outer rugged crater ring.
-	draw_circle(pt, 22.0 + urgency * 3.0, Color(0.04, 0.02, 0.02, 0.85))
-	draw_circle(pt, 18.0, Color(0.18, 0.05, 0.05, 0.95))
-	draw_circle(pt, 15.0, Color(0.85, 0.22, 0.12, 0.85 + pulse * 0.15))
+	# Danger aura when the chain nears.
+	if urgency > 0.08:
+		var flare_r: float = 42.0 + urgency * 14.0 + pulse * urgency * 8.0
+		draw_circle(pt, flare_r, Color(1.0, 0.25, 0.08, 0.12 + urgency * 0.28 + pulse * 0.12))
+		draw_circle(pt, flare_r * 0.72, Color(1.0, 0.45, 0.1, 0.1 + urgency * 0.2))
 
-	# Deep bottomless pit abyss.
-	draw_circle(pt, 11.5, Color(0.03, 0.01, 0.01, 1.0))
+	# Outer woven straw bowl — layered ring strands.
+	var outer_r: float = 30.0 * breathe
+	_fill_ellipse(pt + Vector2(0, 3), Vector2(outer_r + 2, outer_r * 0.78), Color(0.28, 0.16, 0.06, 0.95))
+	_fill_ellipse(pt + Vector2(0, 2), Vector2(outer_r, outer_r * 0.74), Color(0.42, 0.26, 0.10, 0.98))
 
-	# Hazard teeth / spikes pointing inward.
-	var spike_count: int = 6
-	var rot_offset: float = _anim_time * (1.2 + urgency * 2.0)
-	for i: int in range(spike_count):
-		var ang: float = rot_offset + float(i) * (TAU / float(spike_count))
-		var outer_v := pt + Vector2.from_angle(ang) * 14.0
-		var inner_v := pt + Vector2.from_angle(ang) * 6.5
-		var side_v1 := pt + Vector2.from_angle(ang - 0.26) * 13.0
-		var side_v2 := pt + Vector2.from_angle(ang + 0.26) * 13.0
-		draw_colored_polygon(PackedVector2Array([side_v1, inner_v, side_v2]), Color(1.0, 0.82, 0.35, 0.90))
+	# Twig / straw fiber strokes around the rim.
+	var fiber_cols: Array[Color] = [
+		Color(0.55, 0.36, 0.14, 0.9),
+		Color(0.72, 0.52, 0.22, 0.85),
+		Color(0.38, 0.22, 0.08, 0.8),
+		Color(0.82, 0.64, 0.28, 0.75),
+	]
+	for ring: int in range(3):
+		var rr: float = (outer_r - 2.0) - float(ring) * 3.2
+		var fibers: int = 18 + ring * 4
+		for i: int in range(fibers):
+			var a: float = float(i) / float(fibers) * TAU + float(ring) * 0.35 + _anim_time * 0.05
+			var wobble: float = sin(a * 3.0 + float(ring)) * 2.2
+			var p0: Vector2 = pt + Vector2(cos(a), sin(a) * 0.74) * (rr - 3.0 + wobble)
+			var p1: Vector2 = pt + Vector2(cos(a + 0.18), sin(a + 0.18) * 0.74) * (rr + 1.5 + wobble * 0.5)
+			draw_line(p0, p1, fiber_cols[(i + ring) % fiber_cols.size()], 1.6 + float(ring) * 0.3, true)
 
-	# Central vortex molten glow.
-	draw_circle(pt, 5.5, Color(1.0, 0.32, 0.15, 0.95))
-	draw_circle(pt, 2.5, Color(1.0, 0.92, 0.65, 1.0))
+	# Inner soft nest bed (down / moss).
+	_fill_ellipse(pt + Vector2(0, 1), Vector2(18.5, 14.0), Color(0.22, 0.28, 0.12, 0.95))
+	_fill_ellipse(pt, Vector2(16.0, 12.0), Color(0.32, 0.40, 0.18, 0.92))
+	_fill_ellipse(pt + Vector2(-1, -1), Vector2(12.0, 9.0), Color(0.45, 0.52, 0.28, 0.55))
 
-	# Danger crossbar indicator.
-	var cross_len: float = 7.0 + urgency * 2.0
-	var cross_col := Color(0.08, 0.02, 0.02, 0.90)
-	draw_line(pt + Vector2(-cross_len, -cross_len), pt + Vector2(cross_len, cross_len), cross_col, 2.4, true)
-	draw_line(pt + Vector2(cross_len, -cross_len), pt + Vector2(-cross_len, cross_len), cross_col, 2.4, true)
+	# Three eggs nestled in the center.
+	_draw_egg(pt + Vector2(-6, 1), 5.2, 6.6, Color(0.96, 0.93, 0.82), urgency)
+	_draw_egg(pt + Vector2(5.5, 2), 4.8, 6.1, Color(0.98, 0.95, 0.86), urgency)
+	_draw_egg(pt + Vector2(0, -3.5), 5.5, 7.0, Color(1.0, 0.97, 0.88), urgency)
+
+	# Soft feather tufts on the rim.
+	for i: int in range(5):
+		var a: float = -0.6 + float(i) * 0.45 + sin(_anim_time + float(i)) * 0.05
+		var base: Vector2 = pt + Vector2(cos(a), sin(a) * 0.7) * 22.0
+		var tip: Vector2 = base + Vector2(cos(a), sin(a) * 0.5) * 7.0 + Vector2(0, -3)
+		draw_line(base, tip, Color(0.95, 0.9, 0.75, 0.55), 1.4, true)
+		draw_circle(tip, 1.2, Color(0.98, 0.94, 0.82, 0.5))
+
+	# Rim highlight (sun catching straw).
+	draw_arc(pt + Vector2(0, -2), 26.0, -2.4, -0.6, 18, Color(0.95, 0.82, 0.45, 0.35), 2.0, true)
+
+	# Threatened state: red stress cracks / heat under eggs.
+	if urgency > 0.2:
+		var heat: float = urgency * (0.45 + pulse * 0.4)
+		draw_circle(pt, 10.0, Color(1.0, 0.3, 0.08, heat * 0.55))
+		# Warning chevrons around nest.
+		var chev_count: int = 8
+		for i: int in range(chev_count):
+			var ang: float = _anim_time * (1.5 + urgency) + float(i) * (TAU / float(chev_count))
+			var outer_v := pt + Vector2.from_angle(ang) * (34.0 + pulse * 3.0)
+			var side := Vector2.from_angle(ang + PI * 0.5) * 4.0
+			var tip := pt + Vector2.from_angle(ang) * (28.0 + pulse * 2.0)
+			draw_colored_polygon(
+				PackedVector2Array([outer_v + side, tip, outer_v - side]),
+				Color(1.0, 0.75, 0.2, 0.35 + pulse * 0.35)
+			)
+
+
+func _draw_egg(center: Vector2, rx: float, ry: float, col: Color, urgency: float) -> void:
+	# Soft contact shadow under egg.
+	_fill_ellipse(center + Vector2(1, ry * 0.55), Vector2(rx * 0.9, ry * 0.28), Color(0, 0, 0, 0.25))
+	# Shell body
+	_fill_ellipse(center, Vector2(rx, ry), col.darkened(0.08))
+	_fill_ellipse(center + Vector2(-rx * 0.08, -ry * 0.08), Vector2(rx * 0.9, ry * 0.88), col)
+	# Specular
+	_fill_ellipse(center + Vector2(-rx * 0.28, -ry * 0.35), Vector2(rx * 0.28, ry * 0.22), Color(1, 1, 1, 0.45))
+	# Speckle
+	draw_circle(center + Vector2(rx * 0.25, ry * 0.1), 0.9, col.darkened(0.18))
+	draw_circle(center + Vector2(-rx * 0.15, ry * 0.25), 0.7, col.darkened(0.15))
+	# Crack when threatened
+	if urgency > 0.55:
+		var crack := Color(0.35, 0.12, 0.05, 0.55 + _danger_pulse * 0.3)
+		draw_line(center + Vector2(-rx * 0.2, -ry * 0.4), center + Vector2(rx * 0.1, ry * 0.15), crack, 1.2, true)
+		draw_line(center + Vector2(rx * 0.1, ry * 0.15), center + Vector2(rx * 0.35, -ry * 0.05), crack, 1.0, true)
+
+
+func _fill_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
+	var pts := PackedVector2Array()
+	for i: int in range(28):
+		var a: float = float(i) / 28.0 * TAU
+		pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
+	draw_colored_polygon(pts, color)
 
 
 func _path_to_local(path_local_point: Vector2) -> Vector2:

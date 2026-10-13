@@ -89,18 +89,25 @@ func _draw_match(c: Vector2, s: float) -> void:
 
 
 func _draw_nest(c: Vector2, s: float) -> void:
-	var pulse := 1.0 + 0.06 * sin(_t * 4.0)
-	# Sunburst
-	for i: int in range(12):
-		var a: float = float(i) / 12.0 * TAU + _t * 0.4
-		var outer: float = 38.0 * s * pulse
-		draw_line(c, c + Vector2.from_angle(a) * outer, Color(0.95, 0.75, 0.2, 0.85), 4.0 * s, true)
-	draw_circle(c, 26 * s, Color(0.85, 0.65, 0.15))
-	draw_circle(c, 20 * s, Color(0.22, 0.18, 0.12))
-	# Nest / egg danger mark
-	_oval(c + Vector2(0, 2 * s), 12 * s, 9 * s, Color(0.95, 0.9, 0.7))
-	draw_line(c + Vector2(-5 * s, -2 * s), c + Vector2(5 * s, 6 * s), Color(0.85, 0.2, 0.15), 3.0 * s, true)
-	draw_circle(c + Vector2(0, -8 * s), 3 * s, Color(0.9, 0.25, 0.2))
+	var pulse := 1.0 + 0.04 * sin(_t * 2.5)
+	# Shadow
+	_oval(c + Vector2(1 * s, 8 * s), 28 * s, 10 * s, Color(0, 0, 0, 0.3))
+	# Straw bowl
+	_oval(c + Vector2(0, 2 * s), 26 * s * pulse, 20 * s * pulse, Color(0.4, 0.24, 0.1))
+	_oval(c, 22 * s, 16 * s, Color(0.55, 0.36, 0.14))
+	# Fiber hints
+	for i: int in range(10):
+		var a: float = float(i) / 10.0 * TAU
+		var p0: Vector2 = c + Vector2(cos(a), sin(a) * 0.7) * 16 * s
+		var p1: Vector2 = c + Vector2(cos(a + 0.2), sin(a + 0.2) * 0.7) * 23 * s
+		draw_line(p0, p1, Color(0.72, 0.52, 0.22, 0.8), 1.5 * s, true)
+	# Soft bed
+	_oval(c, 14 * s, 10 * s, Color(0.35, 0.42, 0.2))
+	# Eggs
+	_oval(c + Vector2(-5 * s, 1 * s), 4.5 * s, 5.5 * s, Color(0.97, 0.94, 0.84))
+	_oval(c + Vector2(5 * s, 2 * s), 4 * s, 5 * s, Color(0.99, 0.96, 0.88))
+	_oval(c + Vector2(0, -3 * s), 4.8 * s, 6 * s, Color(1.0, 0.97, 0.9))
+	draw_circle(c + Vector2(-6 * s, -1 * s), 1.2 * s, Color(1, 1, 1, 0.5))
 
 
 func _draw_bonus(c: Vector2, s: float) -> void:
