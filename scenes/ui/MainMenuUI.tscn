@@ -1,9 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://bmainmenu001"]
+[gd_scene load_steps=6 format=3 uid="uid://bmainmenu001"]
 
 [ext_resource type="Script" path="res://scripts/ui/MainMenuUI.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/ui/ChickenMascot.gd" id="2_mascot"]
 [ext_resource type="Script" path="res://scripts/ui/MenuAtmosphere.gd" id="3_atmo"]
 [ext_resource type="PackedScene" path="res://scenes/ui/PlayerProfileUI.tscn" id="4_prof"]
+[ext_resource type="PackedScene" path="res://scenes/ui/InstructionsUI.tscn" id="5_inst"]
 
 [node name="MainMenuUI" type="Control"]
 layout_mode = 3
@@ -190,4 +191,7 @@ layout_mode = 2
 text = "Quit"
 
 [node name="PlayerProfileUI" parent="." instance=ExtResource("4_prof")]
+visible = false
+
+[node name="InstructionsUI" parent="." instance=ExtResource("5_inst")]
 visible = false

@@ -9,6 +9,7 @@ signal closed
 @onready var _mute: CheckButton = $Safe/VBox/Mute
 @onready var _shake: CheckButton = $Safe/VBox/ReducedShake
 @onready var _fx: CheckButton = $Safe/VBox/ReducedFx
+@onready var _how_to: Button = $Safe/VBox/HowToPlayButton if has_node("Safe/VBox/HowToPlayButton") else null
 @onready var _back: Button = $Safe/VBox/BackButton
 @onready var _title: Label = $Safe/VBox/Title
 
@@ -19,6 +20,10 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	UITheme.style_title(_title, UITheme.HEADING_SIZE)
 	_title.text = "Settings"
+	if _how_to:
+		UITheme.apply_ghost_button(_how_to)
+		_how_to.text = "How to Play"
+		_how_to.pressed.connect(_on_how_to_play)
 	UITheme.apply_ghost_button(_back)
 	_back.text = "Back"
 	_back.pressed.connect(_on_back)
@@ -56,6 +61,23 @@ func _on_changed(_v: float) -> void:
 		_fx.button_pressed
 	)
 	EventBus.settings_changed.emit()
+
+
+func _on_how_to_play() -> void:
+	if _how_to:
+		UIFx.punch_button(_how_to)
+	var menu: Node = get_parent().get_node_or_null("MainMenuUI")
+	var instructions: Node = menu.get_node_or_null("InstructionsUI") if menu else null
+	if instructions and instructions.has_method("open_instructions"):
+		visible = false
+		instructions.open_instructions(false)
+		if not instructions.closed.is_connected(_on_instructions_closed):
+			instructions.closed.connect(_on_instructions_closed, CONNECT_ONE_SHOT)
+
+
+func _on_instructions_closed() -> void:
+	if GameManager.state == GameManager.State.MAIN_MENU:
+		open_settings()
 
 
 func _on_back() -> void:

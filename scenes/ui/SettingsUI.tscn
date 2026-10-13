@@ -101,6 +101,11 @@ text = "Reduce screen shake"
 layout_mode = 2
 text = "Reduce visual effects"
 
+[node name="HowToPlayButton" type="Button" parent="Safe/VBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "How to Play"
+
 [node name="BackButton" type="Button" parent="Safe/VBox"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2

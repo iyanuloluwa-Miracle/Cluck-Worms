@@ -1,0 +1,200 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/InstructionsUI.gd" id="1_inst"]
+
+[node name="InstructionsUI" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_inst")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.02, 0.05, 0.03, 0.78)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="StoneFrame" type="Control" parent="Center"]
+custom_minimum_size = Vector2(900, 560)
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Inner" type="MarginContainer" parent="Center/StoneFrame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Fill" type="PanelContainer" parent="Center/StoneFrame/Inner"]
+layout_mode = 2
+
+[node name="Pad" type="MarginContainer" parent="Center/StoneFrame/Inner/Fill"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "INSTRUCTIONS"
+horizontal_alignment = 1
+
+[node name="Grid" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="TopRow" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Shoot" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
+layout_mode = 2
+text = "🐔"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "SHOOT"
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="Match" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
+layout_mode = 2
+text = "🐛"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "MATCH"
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="BottomRow" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Nest" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+layout_mode = 2
+text = "🪺"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "NEST"
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="Bonus" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+layout_mode = 2
+text = "⭐"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "BONUS"
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="Swap" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+layout_mode = 2
+text = "🖱️"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "SWAP"
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="Footer" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="DontShow" type="CheckButton" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "DON'T SHOW THIS SCREEN AT STARTUP."
+
+[node name="OkButton" type="Button" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Footer"]
+custom_minimum_size = Vector2(140, 52)
+layout_mode = 2
+text = "OK"

@@ -29,8 +29,10 @@ extends Control
 	else null
 )
 @onready var _profile_dialog: Control = $PlayerProfileUI if has_node("PlayerProfileUI") else null
+@onready var _instructions: Control = $InstructionsUI if has_node("InstructionsUI") else null
 
 var _play_pulse: Tween
+var _awaiting_instructions_after_profile: bool = false
 
 
 func _ready() -> void:
@@ -47,12 +49,17 @@ func _ready() -> void:
 	EventBus.high_score_changed.connect(_on_high_score)
 	EventBus.game_state_changed.connect(_on_state)
 	EventBus.player_profile_changed.connect(_on_profile_changed)
+	if _profile_dialog and _profile_dialog.has_signal("profile_confirmed"):
+		_profile_dialog.profile_confirmed.connect(_on_profile_confirmed_for_instructions)
 	_refresh_high_score(SaveService.high_score)
 	_refresh_leaderboard()
 	_refresh_greeting()
 	_on_state(-1, int(GameManager.state))
 	if not SaveService.profile_setup_done:
+		_awaiting_instructions_after_profile = true
 		call_deferred("_prompt_new_user")
+	else:
+		call_deferred("_maybe_show_instructions")
 
 
 func _style() -> void:
@@ -178,9 +185,25 @@ func _refresh_greeting() -> void:
 
 func _prompt_new_user() -> void:
 	if SaveService.profile_setup_done:
+		_maybe_show_instructions()
 		return
 	if _profile_dialog and _profile_dialog.has_method("open_dialog"):
 		_profile_dialog.open_dialog(true)
+
+
+func _maybe_show_instructions() -> void:
+	if not SaveService.profile_setup_done:
+		return
+	if SaveService.tutorial_done:
+		return
+	if _instructions and _instructions.has_method("open_instructions"):
+		_instructions.open_instructions(true)
+
+
+func _on_profile_confirmed_for_instructions(_player_name: String) -> void:
+	if _awaiting_instructions_after_profile:
+		_awaiting_instructions_after_profile = false
+		call_deferred("_maybe_show_instructions")
 
 
 func _on_switch_player() -> void:
