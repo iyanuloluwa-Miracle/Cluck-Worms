@@ -29,6 +29,8 @@ var achievements: Dictionary = {}
 var leaderboard: Array = []
 var current_player_name: String = "Farmer Cluck"
 var profiles: Array = ["Farmer Cluck"]
+## False until the player confirms a name in the NEW USER modal.
+var profile_setup_done: bool = false
 
 
 func _ready() -> void:
@@ -66,6 +68,11 @@ func load_save() -> void:
 		profiles = [current_player_name]
 	elif not profiles.has(current_player_name):
 		profiles.append(current_player_name)
+	# Grandfather existing installs that predate this flag.
+	if cfg.has_section_key(SECTION_PROGRESS, "profile_setup_done"):
+		profile_setup_done = bool(cfg.get_value(SECTION_PROGRESS, "profile_setup_done", false))
+	else:
+		profile_setup_done = true
 	leaderboard = cfg.get_value(SECTION_LEADERBOARD, "entries", []) as Array
 	if leaderboard == null:
 		leaderboard = []
@@ -80,6 +87,7 @@ func _reset_defaults() -> void:
 	tutorial_done = false
 	current_player_name = "Farmer Cluck"
 	profiles = ["Farmer Cluck"]
+	profile_setup_done = false
 	level_records = {}
 	achievements = {}
 	leaderboard = []
@@ -95,6 +103,7 @@ func save() -> void:
 	cfg.set_value(SECTION_PROGRESS, "tutorial_done", tutorial_done)
 	cfg.set_value(SECTION_PROGRESS, "player_name", current_player_name)
 	cfg.set_value(SECTION_PROGRESS, "profiles", profiles)
+	cfg.set_value(SECTION_PROGRESS, "profile_setup_done", profile_setup_done)
 	cfg.set_value(SECTION_LEVELS, "records", level_records)
 	cfg.set_value(SECTION_ACHIEVEMENTS, "flags", achievements)
 	cfg.set_value(SECTION_LEADERBOARD, "entries", leaderboard)
@@ -114,6 +123,7 @@ func set_player_name(new_name: String) -> void:
 	current_player_name = clean
 	if not profiles.has(clean):
 		profiles.append(clean)
+	profile_setup_done = true
 	save()
 	EventBus.player_profile_changed.emit(current_player_name)
 

@@ -23,6 +23,9 @@ const TITLE_STONE := Color(0.86, 0.86, 0.80)
 @onready var _profiles_box: HFlowContainer = $Center/StoneFrame/Inner/Fill/Pad/VBox/ProfilesScroll/ProfileChips
 @onready var _ok_btn: Button = $Center/StoneFrame/Inner/Fill/Pad/VBox/ButtonRow/OkButton
 @onready var _cancel_btn: Button = $Center/StoneFrame/Inner/Fill/Pad/VBox/ButtonRow/CancelButton
+@onready var _profiles_scroll: ScrollContainer = $Center/StoneFrame/Inner/Fill/Pad/VBox/ProfilesScroll
+
+var _first_time: bool = false
 
 
 func _ready() -> void:
@@ -39,11 +42,19 @@ func _ready() -> void:
 	_name_edit.text_submitted.connect(func(_t: String) -> void: _on_ok())
 
 
-func open_dialog() -> void:
+func open_dialog(first_time: bool = false) -> void:
+	_first_time = first_time
 	visible = true
 	modulate.a = 0.0
-	_name_edit.text = SaveService.current_player_name
-	_rebuild_quick_profiles()
+
+	_title.text = "NEW USER"
+	_cancel_btn.visible = not _first_time
+	_profiles_scroll.visible = not _first_time
+	if _first_time:
+		_name_edit.text = ""
+	else:
+		_name_edit.text = SaveService.current_player_name
+		_rebuild_quick_profiles()
 	_frame.queue_redraw()
 
 	_frame.scale = Vector2(0.86, 0.86)
@@ -241,6 +252,9 @@ func _rebuild_quick_profiles() -> void:
 func _on_ok() -> void:
 	var chosen: String = _name_edit.text.strip_edges()
 	if chosen.is_empty():
+		if _first_time:
+			_flash_name_required()
+			return
 		chosen = "Farmer Cluck"
 	SaveService.set_player_name(chosen)
 	UIFx.punch_button(_ok_btn)
@@ -248,7 +262,17 @@ func _on_ok() -> void:
 	close_dialog()
 
 
+func _flash_name_required() -> void:
+	_name_edit.grab_focus()
+	var base := _name_edit.modulate
+	_name_edit.modulate = UITheme.YOLK_HOT
+	var tween := create_tween()
+	tween.tween_property(_name_edit, "modulate", base, 0.35)
+
+
 func _on_cancel() -> void:
+	if _first_time:
+		return
 	UIFx.punch_button(_cancel_btn)
 	profile_cancelled.emit()
 	close_dialog()

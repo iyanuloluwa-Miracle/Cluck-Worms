@@ -51,6 +51,8 @@ func _ready() -> void:
 	_refresh_leaderboard()
 	_refresh_greeting()
 	_on_state(-1, int(GameManager.state))
+	if not SaveService.profile_setup_done:
+		call_deferred("_prompt_new_user")
 
 
 func _style() -> void:
@@ -174,11 +176,18 @@ func _refresh_greeting() -> void:
 		_switch_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
 
 
+func _prompt_new_user() -> void:
+	if SaveService.profile_setup_done:
+		return
+	if _profile_dialog and _profile_dialog.has_method("open_dialog"):
+		_profile_dialog.open_dialog(true)
+
+
 func _on_switch_player() -> void:
 	if _switch_btn:
 		UIFx.punch_button(_switch_btn)
 	if _profile_dialog and _profile_dialog.has_method("open_dialog"):
-		_profile_dialog.open_dialog()
+		_profile_dialog.open_dialog(false)
 
 
 func _on_profile_changed(_player_name: String) -> void:
