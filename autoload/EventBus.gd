@@ -40,6 +40,8 @@ signal high_score_changed(high_score: int, is_new: bool)
 signal game_state_changed(previous: int, next: int)
 
 signal run_started(stage_index: int, level_index: int)
+## Fired when the player starts a Gauntlet (arcade) run from the main menu.
+signal gauntlet_run_started()
 signal level_started(level_id: StringName, display_name: String)
 signal level_completed(level_id: StringName, score: int, lives: int)
 signal stage_completed(stage_id: StringName, stage_index: int, score: int)

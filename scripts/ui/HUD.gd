@@ -15,6 +15,7 @@ extends CanvasLayer
 @onready var _swatch: Control = $Root/Safe/BottomBar/NextChip/Margin/Row/WormSwatch
 @onready var _status: Label = $Root/Safe/StatusLabel
 @onready var _progress_bar: ProgressBar = $Root/Safe/ProgressBar if has_node("Root/Safe/ProgressBar") else null
+@onready var _gauntlet_banner: Label = $Root/Safe/GauntletBanner if has_node("Root/Safe/GauntletBanner") else null
 
 ## Worm progress tracking.
 var _total_worms: int = 0
@@ -23,6 +24,8 @@ var _worms_cleared: int = 0
 ## Danger animation.
 var _danger_urgency: float = 0.0
 var _danger_pulse: float = 0.0
+var _pending_gauntlet_banner: bool = false
+var _gauntlet_banner_tween: Tween
 
 
 func _ready() -> void:
@@ -41,7 +44,16 @@ func _ready() -> void:
 	EventBus.chicken_loadout_changed.connect(_on_loadout)
 	EventBus.danger_warning.connect(_on_danger)
 	EventBus.chain_worms_removed.connect(_on_worms_removed)
+	EventBus.gauntlet_run_started.connect(_on_gauntlet_run_started)
 	_on_combo(0)
+	if _gauntlet_banner:
+		_gauntlet_banner.visible = false
+		UITheme.apply_font(_gauntlet_banner, UITheme.WEIGHT_BOLD)
+		_gauntlet_banner.add_theme_font_size_override("font_size", 48)
+		_gauntlet_banner.add_theme_color_override("font_color", Color(1.0, 0.82, 0.28, 1.0))
+		_gauntlet_banner.add_theme_color_override("font_outline_color", Color(0.35, 0.1, 0.02, 0.95))
+		_gauntlet_banner.add_theme_constant_override("outline_size", 10)
+		_gauntlet_banner.text = "GAUNTLET"
 
 
 func _process(delta: float) -> void:
@@ -100,8 +112,48 @@ func _on_state(_prev: int, next: int) -> void:
 		visible = true
 		_root.modulate.a = 0.0
 		UIFx.fade_in(_root, 0.28)
+		if _pending_gauntlet_banner:
+			_pending_gauntlet_banner = false
+			call_deferred("_show_gauntlet_banner")
 	elif not show:
 		visible = false
+		_hide_gauntlet_banner_immediate()
+
+
+func _on_gauntlet_run_started() -> void:
+	_pending_gauntlet_banner = true
+
+
+func _show_gauntlet_banner() -> void:
+	if _gauntlet_banner == null or not visible:
+		return
+	if _gauntlet_banner_tween != null:
+		_gauntlet_banner_tween.kill()
+	_gauntlet_banner.visible = true
+	_gauntlet_banner.modulate.a = 0.0
+	_gauntlet_banner.scale = Vector2(0.7, 0.7)
+	_gauntlet_banner.pivot_offset = _gauntlet_banner.size * 0.5
+	_gauntlet_banner_tween = create_tween()
+	_gauntlet_banner_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 1.0, 0.22)
+	_gauntlet_banner_tween.parallel().tween_property(_gauntlet_banner, "scale", Vector2.ONE, 0.28)
+	_gauntlet_banner_tween.tween_interval(1.15)
+	_gauntlet_banner_tween.tween_property(_gauntlet_banner, "modulate:a", 0.0, 0.35)
+	_gauntlet_banner_tween.tween_callback(func() -> void:
+		if _gauntlet_banner:
+			_gauntlet_banner.visible = false
+	)
+
+
+func _hide_gauntlet_banner_immediate() -> void:
+	_pending_gauntlet_banner = false
+	if _gauntlet_banner_tween != null:
+		_gauntlet_banner_tween.kill()
+		_gauntlet_banner_tween = null
+	if _gauntlet_banner:
+		_gauntlet_banner.visible = false
+		_gauntlet_banner.modulate.a = 1.0
+		_gauntlet_banner.scale = Vector2.ONE
 
 
 func _on_score(new_score: int, delta: int) -> void:

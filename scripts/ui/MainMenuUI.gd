@@ -13,7 +13,8 @@ extends Control
 @onready var _tagline: Label = $SafeArea/Root/BrandBlock/Tagline
 @onready var _high_score: Label = $SafeArea/Root/BrandBlock/HighScore
 @onready var _adventure_btn: Button = $SafeArea/Root/CTA/AdventureButton
-@onready var _gauntlet_btn: Button = $SafeArea/Root/CTA/GauntletButton
+@onready var _gauntlet_btn: Button = $SafeArea/Root/CTA/GauntletSlot/GauntletButton
+@onready var _gauntlet_sub: Label = $SafeArea/Root/CTA/GauntletSlot/GauntletSubtitle
 @onready var _options_btn: Button = $SafeArea/Root/CTA/OptionsButton
 @onready var _howto_btn: Button = $SafeArea/Root/CTA/BottomRow/HowToPlayButton
 @onready var _quit_btn: Button = $SafeArea/Root/CTA/BottomRow/QuitButton
@@ -31,15 +32,20 @@ extends Control
 @onready var _profile_dialog: Control = $PlayerProfileUI if has_node("PlayerProfileUI") else null
 @onready var _instructions: Control = $InstructionsUI if has_node("InstructionsUI") else null
 
-## Adventure = purple stone (featured). Gauntlet/Options = meadow teal slabs.
+## Adventure = purple. Gauntlet = molten ember. Options/utility = teal.
 const STONE_PURPLE := Color(0.48, 0.22, 0.55)
 const STONE_PURPLE_HOT := Color(0.58, 0.30, 0.66)
 const STONE_TEAL := Color(0.18, 0.48, 0.48)
 const STONE_TEAL_HOT := Color(0.24, 0.58, 0.56)
+const STONE_EMBER := Color(0.72, 0.28, 0.08)
+const STONE_EMBER_HOT := Color(0.88, 0.42, 0.10)
+const STONE_EMBER_EDGE := Color(1.0, 0.78, 0.28)
 const STONE_EDGE := Color(0.72, 0.62, 0.28)
 const STONE_GOLD := Color(1.0, 0.90, 0.42)
 
 var _play_pulse: Tween
+var _gauntlet_glow: Tween
+var _gauntlet_styles: Array[StyleBoxFlat] = []
 var _awaiting_instructions_after_profile: bool = false
 
 
@@ -122,12 +128,62 @@ func _style() -> void:
 	_board_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_board_empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
-	# Stone tablet stack — Adventure featured in purple, rest in teal.
+	# Stone tablet stack — Adventure purple, Gauntlet ember, utility teal.
 	_apply_stone_button(_adventure_btn, "ADVENTURE", STONE_PURPLE, STONE_PURPLE_HOT, 28, 72)
-	_apply_stone_button(_gauntlet_btn, "GAUNTLET", STONE_TEAL, STONE_TEAL_HOT, 24, 64)
+	_style_gauntlet_button()
 	_apply_stone_button(_options_btn, "OPTIONS", STONE_TEAL, STONE_TEAL_HOT, 24, 64)
 	_apply_stone_button(_howto_btn, "HOW TO PLAY", STONE_TEAL, STONE_TEAL_HOT, 15, 56)
 	_apply_stone_button(_quit_btn, "QUIT", STONE_TEAL, STONE_TEAL_HOT, 15, 56)
+
+
+func _style_gauntlet_button() -> void:
+	_gauntlet_btn.text = "GAUNTLET"
+	UITheme.apply_font(_gauntlet_btn, UITheme.WEIGHT_BOLD)
+	_gauntlet_btn.add_theme_font_size_override("font_size", 26)
+	_gauntlet_btn.add_theme_color_override("font_color", Color(1.0, 0.94, 0.55, 1.0))
+	_gauntlet_btn.add_theme_color_override("font_hover_color", Color(1.0, 0.98, 0.78, 1.0))
+	_gauntlet_btn.add_theme_color_override("font_pressed_color", Color(1.0, 0.82, 0.35, 1.0))
+	_gauntlet_btn.add_theme_color_override("font_outline_color", Color(0.25, 0.08, 0.02, 0.95))
+	_gauntlet_btn.add_theme_constant_override("outline_size", 6)
+	_gauntlet_btn.custom_minimum_size = Vector2(0, 76)
+
+	_gauntlet_styles.clear()
+	var n := _ember_style(STONE_EMBER, false, false)
+	var h := _ember_style(STONE_EMBER_HOT, true, false)
+	var p := _ember_style(STONE_EMBER.darkened(0.12), false, true)
+	_gauntlet_styles.append(n)
+	_gauntlet_styles.append(h)
+	_gauntlet_styles.append(p)
+	_gauntlet_btn.add_theme_stylebox_override("normal", n)
+	_gauntlet_btn.add_theme_stylebox_override("hover", h)
+	_gauntlet_btn.add_theme_stylebox_override("pressed", p)
+	_gauntlet_btn.add_theme_stylebox_override("focus", h)
+
+	_gauntlet_sub.text = "HIGH SCORE RUN"
+	UITheme.apply_font(_gauntlet_sub, UITheme.WEIGHT_BOLD)
+	_gauntlet_sub.add_theme_font_size_override("font_size", 12)
+	_gauntlet_sub.add_theme_color_override("font_color", Color(1.0, 0.72, 0.32, 0.95))
+	_gauntlet_sub.add_theme_color_override("font_outline_color", Color(0.15, 0.05, 0.02, 0.8))
+	_gauntlet_sub.add_theme_constant_override("outline_size", 2)
+	_gauntlet_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func _ember_style(fill: Color, lit: bool = false, pressed: bool = false) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = fill
+	s.border_color = STONE_EMBER_EDGE.lightened(0.2) if lit else STONE_EMBER_EDGE
+	s.set_border_width_all(6)
+	s.border_width_top = 8 if not pressed else 4
+	s.border_width_bottom = 5 if not pressed else 7
+	s.set_corner_radius_all(12)
+	s.content_margin_left = 18
+	s.content_margin_right = 18
+	s.content_margin_top = 14 if not pressed else 16
+	s.content_margin_bottom = 14 if not pressed else 12
+	s.shadow_color = Color(1.0, 0.4, 0.05, 0.45 if not pressed else 0.2)
+	s.shadow_size = 16 if not pressed else 4
+	s.shadow_offset = Vector2(0, 4 if not pressed else 1)
+	return s
 
 
 func _apply_stone_button(
@@ -308,6 +364,7 @@ func _on_state(_prev: int, next: int) -> void:
 		_play_entrance()
 	else:
 		_stop_play_pulse()
+		_stop_gauntlet_glow()
 		if visible:
 			UIFx.fade_out(self, 0.22)
 		else:
@@ -339,7 +396,12 @@ func _play_entrance() -> void:
 	tween.tween_property(_mascot, "scale", Vector2.ONE, 0.55).set_delay(0.12).set_trans(Tween.TRANS_BACK)
 	tween.tween_property(_cta, "modulate:a", 1.0, 0.4).set_delay(0.18)
 	tween.tween_property(_cta, "scale", Vector2.ONE, 0.5).set_delay(0.18).set_trans(Tween.TRANS_BACK)
-	tween.chain().tween_callback(_start_play_pulse)
+	tween.chain().tween_callback(_start_menu_pulses)
+
+
+func _start_menu_pulses() -> void:
+	_start_play_pulse()
+	_start_gauntlet_glow()
 
 
 func _start_play_pulse() -> void:
@@ -362,6 +424,39 @@ func _stop_play_pulse() -> void:
 		_adventure_btn.scale = Vector2.ONE
 
 
+func _start_gauntlet_glow() -> void:
+	_stop_gauntlet_glow()
+	if not is_instance_valid(_gauntlet_btn) or not visible:
+		return
+	_gauntlet_glow = create_tween()
+	_gauntlet_glow.set_loops()
+	_gauntlet_glow.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_gauntlet_glow.tween_method(_set_gauntlet_ember_glow, 0.0, 1.0, 1.1)
+	_gauntlet_glow.tween_method(_set_gauntlet_ember_glow, 1.0, 0.0, 1.1)
+
+
+func _stop_gauntlet_glow() -> void:
+	if _gauntlet_glow != null:
+		_gauntlet_glow.kill()
+		_gauntlet_glow = null
+	_set_gauntlet_ember_glow(0.0)
+	if is_instance_valid(_gauntlet_btn):
+		_gauntlet_btn.modulate = Color.WHITE
+	if is_instance_valid(_gauntlet_sub):
+		_gauntlet_sub.modulate = Color.WHITE
+
+
+func _set_gauntlet_ember_glow(t: float) -> void:
+	for s: StyleBoxFlat in _gauntlet_styles:
+		s.shadow_color = Color(1.0, 0.42 + t * 0.2, 0.05, 0.35 + t * 0.4)
+		s.shadow_size = int(14.0 + t * 12.0)
+		s.border_color = STONE_EMBER_EDGE.lerp(Color(1.0, 0.95, 0.55), t * 0.55)
+	if is_instance_valid(_gauntlet_btn):
+		_gauntlet_btn.modulate = Color(1.0, 0.96 + t * 0.04, 0.9 + t * 0.08, 1.0)
+	if is_instance_valid(_gauntlet_sub):
+		_gauntlet_sub.modulate = Color(1.0, 0.9 + t * 0.1, 0.75 + t * 0.2, 1.0)
+
+
 func _on_adventure() -> void:
 	UIFx.punch_button(_adventure_btn)
 	var sel: Node = get_parent().get_node_or_null("LevelSelectUI")
@@ -374,6 +469,7 @@ func _on_adventure() -> void:
 
 func _on_gauntlet() -> void:
 	UIFx.punch_button(_gauntlet_btn)
+	EventBus.gauntlet_run_started.emit()
 	# Jump into the highest unlocked level — arcade-style gauntlet run.
 	var unlocked: int = SaveService.max_level_unlocked
 	var stage_i: int = 0
