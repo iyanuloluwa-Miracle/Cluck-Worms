@@ -3,6 +3,10 @@ extends RefCounted
 ## Design tokens for Cluck & Worms — meadow + yolk, high readability.
 ## Mobile-first: large touch targets, generous margins, strong contrast.
 
+# --- Typography ---
+const FONT_PATH := "res://fonts/Fredoka-Variable.ttf"
+static var _font: Font
+
 # --- Palette ---
 const MEADOW_DEEP := Color(0.07, 0.16, 0.11)
 const MEADOW := Color(0.12, 0.28, 0.18)
@@ -27,6 +31,19 @@ const HEADING_SIZE := 32
 const BODY_SIZE := 18
 const CAPTION_SIZE := 14
 const BUTTON_FONT := 20
+
+
+static func font() -> Font:
+	if _font == null:
+		_font = load(FONT_PATH) as Font
+	return _font
+
+
+static func apply_font(control: Control) -> void:
+	var f := font()
+	if f == null or control == null:
+		return
+	control.add_theme_font_override("font", f)
 
 
 static func panel_style(fill: Color = PANEL, border: Color = PANEL_EDGE, radius: float = PANEL_RADIUS) -> StyleBoxFlat:
@@ -103,6 +120,7 @@ static func button_ghost() -> StyleBoxFlat:
 
 
 static func apply_primary_button(btn: Button) -> void:
+	apply_font(btn)
 	btn.add_theme_stylebox_override("normal", button_normal())
 	btn.add_theme_stylebox_override("hover", button_hover())
 	btn.add_theme_stylebox_override("pressed", button_pressed())
@@ -115,6 +133,7 @@ static func apply_primary_button(btn: Button) -> void:
 
 
 static func apply_ghost_button(btn: Button) -> void:
+	apply_font(btn)
 	var ghost := button_ghost()
 	btn.add_theme_stylebox_override("normal", ghost)
 	btn.add_theme_stylebox_override("hover", ghost)
@@ -128,12 +147,14 @@ static func apply_ghost_button(btn: Button) -> void:
 
 
 static func style_title(label: Label, size: int = TITLE_SIZE) -> void:
+	apply_font(label)
 	label.add_theme_color_override("font_color", YOLK)
 	label.add_theme_font_size_override("font_size", size)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 static func style_body(label: Label, size: int = BODY_SIZE, dim: bool = false) -> void:
+	apply_font(label)
 	label.add_theme_color_override("font_color", CREAM_DIM if dim else CREAM)
 	label.add_theme_font_size_override("font_size", size)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

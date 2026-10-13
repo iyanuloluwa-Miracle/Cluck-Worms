@@ -31,6 +31,10 @@ Scoring="*res://autoload/Scoring.gd"
 QualitySettings="*res://autoload/QualitySettings.gd"
 JuiceDirector="*res://autoload/JuiceDirector.gd"
 
+[gui]
+
+theme/custom="res://resources/ui/AppTheme.tres"
+
 [display]
 
 window/size/viewport_width=1280
