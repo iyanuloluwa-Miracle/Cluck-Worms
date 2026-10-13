@@ -1,5 +1,5 @@
 extends CanvasLayer
-## In-run HUD with a carved stone navbar (Zuma-style) and Cluck & Worms polish.
+## In-run HUD with floating wells over a see-through top strip (Zuma-style).
 
 @onready var _root: Control = $Root
 @onready var _navbar: Control = $Root/Safe/NavBar

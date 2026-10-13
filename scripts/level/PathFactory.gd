@@ -7,7 +7,7 @@ extends RefCounted
 const CHICKEN_NEST: Vector2 = Vector2(640, 400)
 ## Path samples stay at least this far from the chicken (worm radius + aim room).
 const NEST_CLEARANCE: float = 168.0
-## Keep the train below the carved stone HUD bar (Safe top 10 + bar 72 + worm/nest pad).
+## Soft top margin so the chain clears floating HUD wells (Safe top 10 + bar 72 + pad).
 const HUD_TOP_SAFE: float = 118.0
 ## Keep clear of the bottom NEXT chip / status strip.
 const HUD_BOTTOM_SAFE: float = 648.0
