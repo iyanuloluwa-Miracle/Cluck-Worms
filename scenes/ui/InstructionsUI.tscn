@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/InstructionsUI.gd" id="1_inst"]
+[ext_resource type="Script" path="res://scripts/ui/InstructionIcon.gd" id="2_icon"]
 
 [node name="InstructionsUI" type="Control"]
 process_mode = 3
@@ -20,7 +21,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
-color = Color(0.02, 0.05, 0.03, 0.78)
+color = Color(0.02, 0.04, 0.02, 0.82)
 
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -32,7 +33,7 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="StoneFrame" type="Control" parent="Center"]
-custom_minimum_size = Vector2(900, 560)
+custom_minimum_size = Vector2(1020, 620)
 layout_mode = 2
 mouse_filter = 0
 
@@ -43,40 +44,45 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 28
 
 [node name="Fill" type="PanelContainer" parent="Center/StoneFrame/Inner"]
 layout_mode = 2
 
 [node name="Pad" type="MarginContainer" parent="Center/StoneFrame/Inner/Fill"]
 layout_mode = 2
-theme_override_constants/margin_left = 22
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 22
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 14
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="Title" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 48
 text = "INSTRUCTIONS"
 horizontal_alignment = 1
+
+[node name="TitleRule" type="ColorRect" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+color = Color(0.92, 0.78, 0.28, 0.65)
 
 [node name="Grid" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="TopRow" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="Shoot" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow"]
 layout_mode = 2
@@ -85,17 +91,22 @@ size_flags_vertical = 3
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
+[node name="Icon" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
+custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
-text = "🐔"
+script = ExtResource("2_icon")
+kind = 0
+
+[node name="Head" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
+layout_mode = 2
+autowrap_mode = 3
 horizontal_alignment = 1
 
 [node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Shoot/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-text = "SHOOT"
 autowrap_mode = 3
 horizontal_alignment = 1
 
@@ -106,24 +117,29 @@ size_flags_vertical = 3
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
+[node name="Icon" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
+custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
-text = "🐛"
+script = ExtResource("2_icon")
+kind = 1
+
+[node name="Head" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
+layout_mode = 2
+autowrap_mode = 3
 horizontal_alignment = 1
 
 [node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/TopRow/Match/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-text = "MATCH"
 autowrap_mode = 3
 horizontal_alignment = 1
 
 [node name="BottomRow" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid"]
-custom_minimum_size = Vector2(0, 150)
+custom_minimum_size = Vector2(0, 168)
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="Nest" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
 layout_mode = 2
@@ -131,19 +147,22 @@ size_flags_horizontal = 3
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
-[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+[node name="Icon" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
-text = "🪺"
+script = ExtResource("2_icon")
+kind = 2
+
+[node name="Head" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+layout_mode = 2
+autowrap_mode = 3
 horizontal_alignment = 1
 
 [node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Nest/VBox"]
+visible = false
 layout_mode = 2
-size_flags_vertical = 3
-text = "NEST"
-autowrap_mode = 3
-horizontal_alignment = 1
 
 [node name="Bonus" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
 layout_mode = 2
@@ -151,19 +170,22 @@ size_flags_horizontal = 3
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
-[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+[node name="Icon" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
-text = "⭐"
+script = ExtResource("2_icon")
+kind = 3
+
+[node name="Head" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+layout_mode = 2
+autowrap_mode = 3
 horizontal_alignment = 1
 
 [node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus/VBox"]
+visible = false
 layout_mode = 2
-size_flags_vertical = 3
-text = "BONUS"
-autowrap_mode = 3
-horizontal_alignment = 1
 
 [node name="Swap" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow"]
 layout_mode = 2
@@ -171,30 +193,36 @@ size_flags_horizontal = 3
 
 [node name="VBox" type="VBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
-[node name="Icon" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+[node name="Icon" type="Control" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
-text = "🖱️"
-horizontal_alignment = 1
+script = ExtResource("2_icon")
+kind = 4
 
-[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+[node name="Head" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
 layout_mode = 2
-size_flags_vertical = 3
-text = "SWAP"
 autowrap_mode = 3
 horizontal_alignment = 1
 
-[node name="Footer" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+[node name="Body" type="Label" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap/VBox"]
+visible = false
 layout_mode = 2
-theme_override_constants/separation = 16
 
-[node name="DontShow" type="CheckButton" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Footer"]
+[node name="FooterBar" type="PanelContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox"]
+layout_mode = 2
+
+[node name="Footer" type="HBoxContainer" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/FooterBar"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="DontShow" type="CheckButton" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/FooterBar/Footer"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "DON'T SHOW THIS SCREEN AT STARTUP."
 
-[node name="OkButton" type="Button" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/Footer"]
-custom_minimum_size = Vector2(140, 52)
+[node name="OkButton" type="Button" parent="Center/StoneFrame/Inner/Fill/Pad/VBox/FooterBar/Footer"]
+custom_minimum_size = Vector2(160, 56)
 layout_mode = 2
 text = "OK"
