@@ -17,6 +17,9 @@ extends Control
 @onready var _campaign_btn: Button = $SafeArea/Root/CTA/SecondaryRow/CampaignButton
 @onready var _settings_btn: Button = $SafeArea/Root/CTA/SecondaryRow/SettingsButton
 @onready var _quit_btn: Button = $SafeArea/Root/CTA/QuitButton
+@onready var _welcome_label: Label = $SafeArea/Root/BrandBlock/GreetingRow/WelcomeLabel if has_node("SafeArea/Root/BrandBlock/GreetingRow/WelcomeLabel") else null
+@onready var _switch_btn: Button = $SafeArea/Root/BrandBlock/GreetingRow/SwitchPlayerButton if has_node("SafeArea/Root/BrandBlock/GreetingRow/SwitchPlayerButton") else null
+@onready var _profile_dialog: Control = $PlayerProfileUI if has_node("PlayerProfileUI") else null
 
 var _play_pulse: Tween
 
@@ -29,11 +32,15 @@ func _ready() -> void:
 	_campaign_btn.pressed.connect(_on_campaign)
 	_settings_btn.pressed.connect(_on_settings)
 	_quit_btn.pressed.connect(_on_quit)
+	if _switch_btn:
+		_switch_btn.pressed.connect(_on_switch_player)
 	_play_btn.button_down.connect(func() -> void: UIFx.punch_button(_play_btn))
 	EventBus.high_score_changed.connect(_on_high_score)
 	EventBus.game_state_changed.connect(_on_state)
+	EventBus.player_profile_changed.connect(_on_profile_changed)
 	_refresh_high_score(SaveService.high_score)
 	_refresh_leaderboard()
+	_refresh_greeting()
 	_on_state(-1, int(GameManager.state))
 
 
@@ -119,6 +126,32 @@ func _style() -> void:
 	_quit_btn.add_theme_font_size_override("font_size", 16)
 	_quit_btn.text = "Quit"
 	_quit_btn.custom_minimum_size = Vector2(0, 36)
+
+
+func _refresh_greeting() -> void:
+	if _welcome_label:
+		_welcome_label.text = "WELCOME TO CLUCK & WORMS!"
+		_welcome_label.add_theme_font_size_override("font_size", 16)
+		_welcome_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.65, 0.95))
+		_welcome_label.add_theme_color_override("font_outline_color", Color(0.06, 0.14, 0.07, 0.85))
+		_welcome_label.add_theme_constant_override("outline_size", 4)
+	if _switch_btn:
+		_switch_btn.text = "(If you are not %s, click here)" % SaveService.current_player_name
+		_switch_btn.add_theme_font_size_override("font_size", 13)
+		_switch_btn.add_theme_color_override("font_color", Color(0.85, 0.92, 0.82, 0.80))
+		_switch_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
+
+
+func _on_switch_player() -> void:
+	if _switch_btn:
+		UIFx.punch_button(_switch_btn)
+	if _profile_dialog and _profile_dialog.has_method("open_dialog"):
+		_profile_dialog.open_dialog()
+
+
+func _on_profile_changed(_player_name: String) -> void:
+	_refresh_greeting()
+	_refresh_leaderboard()
 
 
 func _refresh_high_score(high: int) -> void:

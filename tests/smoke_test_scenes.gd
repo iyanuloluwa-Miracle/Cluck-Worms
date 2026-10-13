@@ -17,6 +17,7 @@ func _ready() -> void:
 		"res://scenes/ui/LevelCompleteUI.tscn",
 		"res://scenes/ui/StageCompleteUI.tscn",
 		"res://scenes/ui/GameOverUI.tscn",
+		"res://scenes/ui/PlayerProfileUI.tscn",
 	]
 	
 	var failed: int = 0

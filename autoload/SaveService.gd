@@ -27,6 +27,8 @@ var level_records: Dictionary = {}
 var achievements: Dictionary = {}
 ## Local top runs: [{ "name": String, "score": int }, ...] sorted desc.
 var leaderboard: Array = []
+var current_player_name: String = "Farmer Cluck"
+var profiles: Array = ["Farmer Cluck"]
 
 
 func _ready() -> void:
@@ -58,6 +60,12 @@ func load_save() -> void:
 	music_volume = float(cfg.get_value(SECTION_SETTINGS, "music_volume", 0.7))
 	mute_all = bool(cfg.get_value(SECTION_SETTINGS, "mute_all", false))
 	max_level_unlocked = maxi(max_level_unlocked, 1)
+	current_player_name = String(cfg.get_value(SECTION_PROGRESS, "player_name", "Farmer Cluck"))
+	profiles = cfg.get_value(SECTION_PROGRESS, "profiles", ["Farmer Cluck"]) as Array
+	if profiles == null or profiles.is_empty():
+		profiles = [current_player_name]
+	elif not profiles.has(current_player_name):
+		profiles.append(current_player_name)
 	leaderboard = cfg.get_value(SECTION_LEADERBOARD, "entries", []) as Array
 	if leaderboard == null:
 		leaderboard = []
@@ -70,6 +78,8 @@ func _reset_defaults() -> void:
 	stages_cleared = 0
 	max_level_unlocked = 1
 	tutorial_done = false
+	current_player_name = "Farmer Cluck"
+	profiles = ["Farmer Cluck"]
 	level_records = {}
 	achievements = {}
 	leaderboard = []
@@ -83,6 +93,8 @@ func save() -> void:
 	cfg.set_value(SECTION_PROGRESS, "stages_cleared", stages_cleared)
 	cfg.set_value(SECTION_PROGRESS, "max_level_unlocked", max_level_unlocked)
 	cfg.set_value(SECTION_PROGRESS, "tutorial_done", tutorial_done)
+	cfg.set_value(SECTION_PROGRESS, "player_name", current_player_name)
+	cfg.set_value(SECTION_PROGRESS, "profiles", profiles)
 	cfg.set_value(SECTION_LEVELS, "records", level_records)
 	cfg.set_value(SECTION_ACHIEVEMENTS, "flags", achievements)
 	cfg.set_value(SECTION_LEADERBOARD, "entries", leaderboard)
@@ -95,6 +107,17 @@ func save() -> void:
 	cfg.save(SAVE_PATH)
 
 
+func set_player_name(new_name: String) -> void:
+	var clean: String = new_name.strip_edges()
+	if clean.is_empty():
+		clean = "Farmer Cluck"
+	current_player_name = clean
+	if not profiles.has(clean):
+		profiles.append(clean)
+	save()
+	EventBus.player_profile_changed.emit(current_player_name)
+
+
 func try_submit_score(score: int, peak_combo: int = 0) -> bool:
 	var is_new_high: bool = score > high_score
 	var combo_improved: bool = peak_combo > best_combo
@@ -102,7 +125,7 @@ func try_submit_score(score: int, peak_combo: int = 0) -> bool:
 		high_score = score
 	if combo_improved:
 		best_combo = peak_combo
-	var board_changed: bool = _insert_leaderboard(score, "You")
+	var board_changed: bool = _insert_leaderboard(score, current_player_name)
 	if is_new_high or combo_improved or board_changed:
 		save()
 	return is_new_high
