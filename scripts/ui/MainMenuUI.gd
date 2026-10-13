@@ -1,5 +1,5 @@
 extends Control
-## Premium welcome screen — brand-first meadow composition with live atmosphere.
+## Zuma-inspired welcome — greeting up top, stone tablet menu on the right.
 
 @onready var _atmosphere: Control = $Atmosphere
 @onready var _root: Control = $SafeArea/Root
@@ -10,13 +10,13 @@ extends Control
 @onready var _board_empty: Label = $SafeArea/Root/Leaderboard/Pad/Col/EmptyHint
 @onready var _mascot: Control = $SafeArea/Root/Mascot
 @onready var _cta: Control = $SafeArea/Root/CTA
-@onready var _title: Label = $SafeArea/Root/BrandBlock/Title
 @onready var _tagline: Label = $SafeArea/Root/BrandBlock/Tagline
 @onready var _high_score: Label = $SafeArea/Root/BrandBlock/HighScore
-@onready var _play_btn: Button = $SafeArea/Root/CTA/PlayButton
-@onready var _campaign_btn: Button = $SafeArea/Root/CTA/SecondaryRow/CampaignButton
-@onready var _settings_btn: Button = $SafeArea/Root/CTA/SecondaryRow/SettingsButton
-@onready var _quit_btn: Button = $SafeArea/Root/CTA/QuitButton
+@onready var _adventure_btn: Button = $SafeArea/Root/CTA/AdventureButton
+@onready var _gauntlet_btn: Button = $SafeArea/Root/CTA/GauntletButton
+@onready var _options_btn: Button = $SafeArea/Root/CTA/OptionsButton
+@onready var _howto_btn: Button = $SafeArea/Root/CTA/BottomRow/HowToPlayButton
+@onready var _quit_btn: Button = $SafeArea/Root/CTA/BottomRow/QuitButton
 @onready var _greeting_plaque: PanelContainer = $SafeArea/Root/BrandBlock/GreetingPlaque if has_node("SafeArea/Root/BrandBlock/GreetingPlaque") else null
 @onready var _welcome_label: Label = (
 	$SafeArea/Root/BrandBlock/GreetingPlaque/Margin/GreetingCol/WelcomeLabel
@@ -31,6 +31,14 @@ extends Control
 @onready var _profile_dialog: Control = $PlayerProfileUI if has_node("PlayerProfileUI") else null
 @onready var _instructions: Control = $InstructionsUI if has_node("InstructionsUI") else null
 
+## Adventure = purple stone (featured). Gauntlet/Options = meadow teal slabs.
+const STONE_PURPLE := Color(0.48, 0.22, 0.55)
+const STONE_PURPLE_HOT := Color(0.58, 0.30, 0.66)
+const STONE_TEAL := Color(0.18, 0.48, 0.48)
+const STONE_TEAL_HOT := Color(0.24, 0.58, 0.56)
+const STONE_EDGE := Color(0.72, 0.62, 0.28)
+const STONE_GOLD := Color(1.0, 0.90, 0.42)
+
 var _play_pulse: Tween
 var _awaiting_instructions_after_profile: bool = false
 
@@ -39,13 +47,14 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	_style()
-	_play_btn.pressed.connect(_on_play)
-	_campaign_btn.pressed.connect(_on_campaign)
-	_settings_btn.pressed.connect(_on_settings)
+	_adventure_btn.pressed.connect(_on_adventure)
+	_gauntlet_btn.pressed.connect(_on_gauntlet)
+	_options_btn.pressed.connect(_on_settings)
+	_howto_btn.pressed.connect(_on_howto)
 	_quit_btn.pressed.connect(_on_quit)
 	if _switch_btn:
 		_switch_btn.pressed.connect(_on_switch_player)
-	_play_btn.button_down.connect(func() -> void: UIFx.punch_button(_play_btn))
+	_adventure_btn.button_down.connect(func() -> void: UIFx.punch_button(_adventure_btn))
 	EventBus.high_score_changed.connect(_on_high_score)
 	EventBus.game_state_changed.connect(_on_state)
 	EventBus.player_profile_changed.connect(_on_profile_changed)
@@ -64,34 +73,26 @@ func _ready() -> void:
 
 func _style() -> void:
 	if _greeting_plaque:
-		var plaque := UITheme.chip_style(Color(0.08, 0.16, 0.11, 0.82))
-		plaque.border_color = Color(1.0, 0.88, 0.35, 0.22)
+		var plaque := StyleBoxFlat.new()
+		plaque.bg_color = Color(0.08, 0.14, 0.10, 0.55)
+		plaque.border_color = Color(1.0, 0.88, 0.35, 0.28)
 		plaque.set_border_width_all(2)
+		plaque.set_corner_radius_all(14)
 		plaque.content_margin_left = 0
 		plaque.content_margin_right = 0
 		plaque.content_margin_top = 0
 		plaque.content_margin_bottom = 0
 		_greeting_plaque.add_theme_stylebox_override("panel", plaque)
 
-	# Hero title — thick Fredoka Bold with deep meadow outline.
-	_title.text = "Cluck & Worms"
-	UITheme.apply_font(_title, UITheme.WEIGHT_BOLD)
-	_title.add_theme_font_size_override("font_size", 72)
-	_title.add_theme_color_override("font_color", UITheme.YOLK_HOT)
-	_title.add_theme_color_override("font_outline_color", Color(0.08, 0.18, 0.10, 0.92))
-	_title.add_theme_constant_override("outline_size", 16)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-
-	_tagline.text = "Aim. Match. Cascade."
 	UITheme.apply_font(_tagline, UITheme.WEIGHT_SEMIBOLD)
-	_tagline.add_theme_font_size_override("font_size", 22)
-	_tagline.add_theme_color_override("font_color", Color(0.98, 0.97, 0.9, 0.95))
-	_tagline.add_theme_color_override("font_outline_color", Color(0.05, 0.12, 0.07, 0.7))
-	_tagline.add_theme_constant_override("outline_size", 5)
+	_tagline.add_theme_font_size_override("font_size", 18)
+	_tagline.add_theme_color_override("font_color", Color(0.98, 0.97, 0.9, 0.88))
+	_tagline.add_theme_color_override("font_outline_color", Color(0.05, 0.12, 0.07, 0.65))
+	_tagline.add_theme_constant_override("outline_size", 4)
 	_tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	UITheme.apply_font(_high_score, UITheme.WEIGHT_BOLD)
-	_high_score.add_theme_font_size_override("font_size", 18)
+	_high_score.add_theme_font_size_override("font_size", 17)
 	_high_score.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45, 0.95))
 	_high_score.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.6))
 	_high_score.add_theme_constant_override("outline_size", 4)
@@ -121,66 +122,76 @@ func _style() -> void:
 	_board_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_board_empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
-	UITheme.apply_primary_button(_play_btn)
-	_play_btn.text = "PLAY"
-	UITheme.apply_font(_play_btn, UITheme.WEIGHT_BOLD)
-	_play_btn.add_theme_font_size_override("font_size", 28)
-	_play_btn.custom_minimum_size = Vector2(0, 68)
+	# Stone tablet stack — Adventure featured in purple, rest in teal.
+	_apply_stone_button(_adventure_btn, "ADVENTURE", STONE_PURPLE, STONE_PURPLE_HOT, 28, 72)
+	_apply_stone_button(_gauntlet_btn, "GAUNTLET", STONE_TEAL, STONE_TEAL_HOT, 24, 64)
+	_apply_stone_button(_options_btn, "OPTIONS", STONE_TEAL, STONE_TEAL_HOT, 24, 64)
+	_apply_stone_button(_howto_btn, "HOW TO PLAY", STONE_TEAL, STONE_TEAL_HOT, 15, 56)
+	_apply_stone_button(_quit_btn, "QUIT", STONE_TEAL, STONE_TEAL_HOT, 15, 56)
 
-	# Juicier primary button.
-	var play_n := UITheme.button_normal()
-	play_n.set_corner_radius_all(20)
-	play_n.shadow_size = 10
-	play_n.shadow_offset = Vector2(0, 5)
-	play_n.content_margin_top = 16
-	play_n.content_margin_bottom = 16
-	var play_h := UITheme.button_hover()
-	play_h.set_corner_radius_all(20)
-	play_h.shadow_size = 12
-	var play_p := UITheme.button_pressed()
-	play_p.set_corner_radius_all(20)
-	_play_btn.add_theme_stylebox_override("normal", play_n)
-	_play_btn.add_theme_stylebox_override("hover", play_h)
-	_play_btn.add_theme_stylebox_override("pressed", play_p)
-	_play_btn.add_theme_stylebox_override("focus", play_h)
 
-	UITheme.apply_ghost_button(_campaign_btn)
-	_campaign_btn.text = "Campaign"
-	UITheme.apply_font(_campaign_btn, UITheme.WEIGHT_BOLD)
-	_campaign_btn.add_theme_font_size_override("font_size", 20)
-	UITheme.apply_ghost_button(_settings_btn)
-	_settings_btn.text = "Settings"
-	UITheme.apply_font(_settings_btn, UITheme.WEIGHT_BOLD)
-	_settings_btn.add_theme_font_size_override("font_size", 20)
+func _apply_stone_button(
+	btn: Button,
+	label: String,
+	fill: Color,
+	hover: Color,
+	font_size: int,
+	min_h: float
+) -> void:
+	btn.text = label
+	UITheme.apply_font(btn, UITheme.WEIGHT_BOLD)
+	btn.add_theme_font_size_override("font_size", font_size)
+	btn.add_theme_color_override("font_color", STONE_GOLD)
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.65, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(0.95, 0.82, 0.3, 1.0))
+	btn.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.02, 0.9))
+	btn.add_theme_constant_override("outline_size", 5)
+	btn.custom_minimum_size = Vector2(0, min_h)
+	btn.add_theme_stylebox_override("normal", _stone_style(fill))
+	btn.add_theme_stylebox_override("hover", _stone_style(hover, true))
+	btn.add_theme_stylebox_override("pressed", _stone_style(fill.darkened(0.12), false, true))
+	btn.add_theme_stylebox_override("focus", _stone_style(hover, true))
 
-	# Quit as quiet text action — not competing with Play.
-	var quit_style := StyleBoxEmpty.new()
-	_quit_btn.add_theme_stylebox_override("normal", quit_style)
-	_quit_btn.add_theme_stylebox_override("hover", quit_style)
-	_quit_btn.add_theme_stylebox_override("pressed", quit_style)
-	_quit_btn.add_theme_stylebox_override("focus", quit_style)
-	UITheme.apply_font(_quit_btn, UITheme.WEIGHT_SEMIBOLD)
-	_quit_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
-	_quit_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
-	_quit_btn.add_theme_font_size_override("font_size", 16)
-	_quit_btn.text = "Quit"
-	_quit_btn.custom_minimum_size = Vector2(0, 36)
+
+func _stone_style(fill: Color, lit: bool = false, pressed: bool = false) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = fill
+	s.border_color = STONE_EDGE.lightened(0.15) if lit else STONE_EDGE
+	s.set_border_width_all(5)
+	s.border_width_top = 6 if not pressed else 3
+	s.border_width_bottom = 4 if not pressed else 6
+	s.set_corner_radius_all(10)
+	s.content_margin_left = 18
+	s.content_margin_right = 18
+	s.content_margin_top = 12 if not pressed else 14
+	s.content_margin_bottom = 12 if not pressed else 10
+	s.shadow_color = Color(0, 0, 0, 0.4 if not pressed else 0.2)
+	s.shadow_size = 10 if not pressed else 3
+	s.shadow_offset = Vector2(0, 5 if not pressed else 1)
+	return s
 
 
 func _refresh_greeting() -> void:
+	var pname: String = SaveService.current_player_name.to_upper()
 	if _welcome_label:
-		_welcome_label.text = "★ WELCOME TO CLUCK & WORMS! ★"
+		_welcome_label.text = "WELCOME TO CLUCK & WORMS, %s!" % pname
 		UITheme.apply_font(_welcome_label, UITheme.WEIGHT_BOLD)
-		_welcome_label.add_theme_font_size_override("font_size", 18)
-		_welcome_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.65, 0.98))
-		_welcome_label.add_theme_color_override("font_outline_color", Color(0.06, 0.14, 0.07, 0.85))
-		_welcome_label.add_theme_constant_override("outline_size", 4)
+		_welcome_label.add_theme_font_size_override("font_size", 24)
+		_welcome_label.add_theme_color_override("font_color", STONE_GOLD)
+		_welcome_label.add_theme_color_override("font_outline_color", Color(0.08, 0.12, 0.04, 0.9))
+		_welcome_label.add_theme_constant_override("outline_size", 5)
 	if _switch_btn:
-		_switch_btn.text = "(If you are not %s, click here to switch)" % SaveService.current_player_name
+		_switch_btn.text = "(IF THIS IS NOT YOU, CLICK HERE.)"
 		UITheme.apply_font(_switch_btn, UITheme.WEIGHT_SEMIBOLD)
-		_switch_btn.add_theme_font_size_override("font_size", 14)
-		_switch_btn.add_theme_color_override("font_color", Color(0.85, 0.92, 0.82, 0.85))
-		_switch_btn.add_theme_color_override("font_hover_color", UITheme.YOLK_HOT)
+		_switch_btn.add_theme_font_size_override("font_size", 13)
+		_switch_btn.add_theme_color_override("font_color", Color(0.92, 0.95, 0.85, 0.88))
+		_switch_btn.add_theme_color_override("font_hover_color", STONE_GOLD)
+		_switch_btn.flat = true
+		var empty := StyleBoxEmpty.new()
+		_switch_btn.add_theme_stylebox_override("normal", empty)
+		_switch_btn.add_theme_stylebox_override("hover", empty)
+		_switch_btn.add_theme_stylebox_override("pressed", empty)
+		_switch_btn.add_theme_stylebox_override("focus", empty)
 
 
 func _prompt_new_user() -> void:
@@ -304,7 +315,6 @@ func _on_state(_prev: int, next: int) -> void:
 
 
 func _play_entrance() -> void:
-	# Staggered reveal: atmosphere already live; brand → board → mascot → CTA.
 	_brand.modulate.a = 0.0
 	_brand.scale = Vector2(0.94, 0.94)
 	_brand.pivot_offset = Vector2(_brand.size.x * 0.5, 40.0)
@@ -316,7 +326,7 @@ func _play_entrance() -> void:
 	_mascot.pivot_offset = _mascot.size * 0.5
 	_cta.modulate.a = 0.0
 	_cta.scale = Vector2(0.96, 0.96)
-	_cta.pivot_offset = Vector2(_cta.size.x * 0.5, 0.0)
+	_cta.pivot_offset = Vector2(_cta.size.x * 0.5, _cta.size.y * 0.5)
 
 	var tween := create_tween()
 	tween.set_parallel(true)
@@ -327,32 +337,44 @@ func _play_entrance() -> void:
 	tween.tween_property(_leaderboard, "scale", Vector2.ONE, 0.45).set_delay(0.08).set_trans(Tween.TRANS_BACK)
 	tween.tween_property(_mascot, "modulate:a", 1.0, 0.5).set_delay(0.12)
 	tween.tween_property(_mascot, "scale", Vector2.ONE, 0.55).set_delay(0.12).set_trans(Tween.TRANS_BACK)
-	tween.tween_property(_cta, "modulate:a", 1.0, 0.4).set_delay(0.22)
-	tween.tween_property(_cta, "scale", Vector2.ONE, 0.45).set_delay(0.22)
+	tween.tween_property(_cta, "modulate:a", 1.0, 0.4).set_delay(0.18)
+	tween.tween_property(_cta, "scale", Vector2.ONE, 0.5).set_delay(0.18).set_trans(Tween.TRANS_BACK)
 	tween.chain().tween_callback(_start_play_pulse)
 
 
 func _start_play_pulse() -> void:
 	_stop_play_pulse()
-	if not is_instance_valid(_play_btn) or not visible:
+	if not is_instance_valid(_adventure_btn) or not visible:
 		return
-	_play_btn.pivot_offset = _play_btn.size * 0.5
+	_adventure_btn.pivot_offset = _adventure_btn.size * 0.5
 	_play_pulse = create_tween()
 	_play_pulse.set_loops()
 	_play_pulse.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_play_pulse.tween_property(_play_btn, "scale", Vector2(1.035, 1.035), 0.95)
-	_play_pulse.tween_property(_play_btn, "scale", Vector2.ONE, 0.95)
+	_play_pulse.tween_property(_adventure_btn, "scale", Vector2(1.04, 1.04), 0.95)
+	_play_pulse.tween_property(_adventure_btn, "scale", Vector2.ONE, 0.95)
 
 
 func _stop_play_pulse() -> void:
 	if _play_pulse != null:
 		_play_pulse.kill()
 		_play_pulse = null
-	if is_instance_valid(_play_btn):
-		_play_btn.scale = Vector2.ONE
+	if is_instance_valid(_adventure_btn):
+		_adventure_btn.scale = Vector2.ONE
 
 
-func _on_play() -> void:
+func _on_adventure() -> void:
+	UIFx.punch_button(_adventure_btn)
+	var sel: Node = get_parent().get_node_or_null("LevelSelectUI")
+	if sel and sel.has_method("open_select"):
+		visible = false
+		if not sel.closed.is_connected(_on_campaign_closed):
+			sel.closed.connect(_on_campaign_closed)
+		sel.open_select()
+
+
+func _on_gauntlet() -> void:
+	UIFx.punch_button(_gauntlet_btn)
+	# Jump into the highest unlocked level — arcade-style gauntlet run.
 	var unlocked: int = SaveService.max_level_unlocked
 	var stage_i: int = 0
 	var level_i: int = 0
@@ -367,17 +389,6 @@ func _on_play() -> void:
 	GameManager.start_run(stage_i, level_i)
 
 
-func _on_campaign() -> void:
-	UIFx.punch_button(_campaign_btn)
-	var sel: Node = get_parent().get_node_or_null("LevelSelectUI")
-	if sel and sel.has_method("open_select"):
-		# Hide title chrome so Campaign is the only screen.
-		visible = false
-		if not sel.closed.is_connected(_on_campaign_closed):
-			sel.closed.connect(_on_campaign_closed)
-		sel.open_select()
-
-
 func _on_campaign_closed() -> void:
 	if GameManager.state == GameManager.State.MAIN_MENU:
 		visible = true
@@ -386,10 +397,16 @@ func _on_campaign_closed() -> void:
 
 
 func _on_settings() -> void:
-	UIFx.punch_button(_settings_btn)
+	UIFx.punch_button(_options_btn)
 	var settings: Node = get_parent().get_node_or_null("SettingsUI")
 	if settings and settings.has_method("open_settings"):
 		settings.open_settings()
+
+
+func _on_howto() -> void:
+	UIFx.punch_button(_howto_btn)
+	if _instructions and _instructions.has_method("open_instructions"):
+		_instructions.open_instructions(false)
 
 
 func _on_quit() -> void:
