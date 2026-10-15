@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+	<title>$GODOT_PROJECT_NAME</title>
+	<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+#canvas {
+	display: block;
+}
+#canvas:focus {
+	outline: none;
+}
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+#status {
+	background-color: #242424;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+#status-splash.show-image--false {
+	display: none;
+}
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+#status-progress, #status-notice {
+	display: none;
+}
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: system-ui, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+#status-hint {
+	display: none;
+	margin-top: 1rem;
+	padding: 0 1.5rem;
+	max-width: 28rem;
+	text-align: center;
+	font: 500 0.95rem/1.4 system-ui, sans-serif;
+	color: #d8d8d8;
+}
+#vatar-banner {
+	display: none;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 40;
+	padding: 8px 12px;
+	background: rgba(8, 28, 14, 0.92);
+	color: #f6e27a;
+	font: 600 13px/1.3 system-ui, sans-serif;
+	text-align: center;
+	pointer-events: none;
+}
+	</style>
+	$GODOT_HEAD_INCLUDE
+	<script src="https://lagoslife.app/sdk/vatar-games-v1.js"></script>
+</head>
+<body>
+	<div id="vatar-banner"></div>
+	<canvas id="canvas">
+		Your browser does not support the canvas tag.
+	</canvas>
+	<noscript>Your browser does not support JavaScript.</noscript>
+	<div id="status">
+		<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
+		<progress id="status-progress"></progress>
+		<div id="status-hint">Downloading…</div>
+		<div id="status-notice"></div>
+	</div>
+
+	<script src="$GODOT_URL"></script>
+	<script>
+const GODOT_CONFIG = $GODOT_CONFIG;
+const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+const engine = new Engine(GODOT_CONFIG);
+
+/** Bridge used by Godot (VatarBridge.gd) and the Lagos Life / Vatar SDK. */
+window.CluckVatar = {
+	ready: false,
+	player: null,
+	mode: null,
+	_pauseCbs: [],
+	_resumeCbs: [],
+	_purchaseCbs: [],
+	onPause(fn) { this._pauseCbs.push(fn); },
+	onResume(fn) { this._resumeCbs.push(fn); },
+	onPurchase(fn) { this._purchaseCbs.push(fn); },
+	async init() {
+		if (typeof Vatar === "undefined") {
+			return { ok: false, reason: "no_sdk" };
+		}
+		try {
+			const result = await Vatar.init();
+			this.ready = true;
+			this.player = result.player || null;
+			this.mode = result.mode || null;
+			const banner = document.getElementById("vatar-banner");
+			if (banner && this.player && this.player.name) {
+				banner.style.display = "block";
+				banner.textContent = "Hi " + this.player.name + " · Lagos Life";
+				setTimeout(() => { banner.style.display = "none"; }, 3200);
+			}
+			Vatar.onPause(() => this._pauseCbs.forEach((fn) => { try { fn(); } catch (e) {} }));
+			Vatar.onResume(() => this._resumeCbs.forEach((fn) => { try { fn(); } catch (e) {} }));
+			Vatar.onPurchase((p) => this._purchaseCbs.forEach((fn) => { try { fn(p); } catch (e) {} }));
+			// Deliver anything paid while we were away / reloading.
+			try {
+				const pending = await Vatar.purchases();
+				(pending || []).forEach((p) => this._purchaseCbs.forEach((fn) => { try { fn(p); } catch (e) {} }));
+			} catch (e) {}
+			return { ok: true, player: this.player, mode: this.mode };
+		} catch (err) {
+			return { ok: false, reason: (err && err.code) || "init_failed", message: String(err && err.message || err) };
+		}
+	},
+	async submitScore(n) {
+		if (!this.ready || typeof Vatar === "undefined") return null;
+		try { return await Vatar.submitScore(Number(n) | 0); }
+		catch (e) { return null; }
+	},
+	async purchase(productId) {
+		if (!this.ready || typeof Vatar === "undefined") throw new Error("not_ready");
+		return await Vatar.purchase(String(productId));
+	},
+	async session() {
+		if (!this.ready || typeof Vatar === "undefined") throw new Error("not_ready");
+		return await Vatar.session();
+	},
+	async claim(purchaseId) {
+		const { session } = await this.session();
+		const r = await fetch("/claim", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ session, purchaseId }),
+		});
+		if (!r.ok) throw new Error("claim_failed_" + r.status);
+		return await r.json().catch(() => ({ ok: true }));
+	},
+	async leaderboard() {
+		if (!this.ready || typeof Vatar === "undefined") return null;
+		try { return await Vatar.leaderboard(); }
+		catch (e) { return null; }
+	},
+};
+
+(function () {
+	const statusOverlay = document.getElementById("status");
+	const statusProgress = document.getElementById("status-progress");
+	const statusNotice = document.getElementById("status-notice");
+	const statusHint = document.getElementById("status-hint");
+	let initializing = true;
+	let statusMode = "";
+
+	function setHint(text) {
+		if (!statusHint) return;
+		statusHint.textContent = text;
+		statusHint.style.display = text ? "block" : "none";
+	}
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) return;
+		if (mode === "hidden") {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = "visible";
+		statusProgress.style.display = mode === "progress" ? "block" : "none";
+		statusNotice.style.display = mode === "notice" ? "block" : "none";
+		if (statusHint) statusHint.style.display = mode === "progress" ? "block" : "none";
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) statusNotice.removeChild(statusNotice.lastChild);
+		String(text).split("\n").forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement("br"));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		setStatusNotice(err instanceof Error ? err.message : String(err || "An unknown error occurred."));
+		setStatusMode("notice");
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
+	if (missing.length !== 0) {
+		displayFailureNotice("Error\nMissing browser features:\n" + missing.join("\n"));
+		return;
+	}
+
+	setStatusMode("progress");
+	setHint("Downloading… first load can take a minute on mobile.");
+	engine.startGame({
+		onProgress(current, total) {
+			if (current > 0 && total > 0) {
+				statusProgress.value = current;
+				statusProgress.max = total;
+				if (current >= total) {
+					setHint("Compiling engine… keep this tab open (1–3 min on phones).");
+				} else {
+					setHint("Downloading… " + Math.min(100, Math.floor((current / total) * 100)) + "%");
+				}
+			} else {
+				statusProgress.removeAttribute("value");
+				statusProgress.removeAttribute("max");
+				setHint("Preparing…");
+			}
+		},
+	}).then(() => setStatusMode("hidden"), displayFailureNotice);
+}());
+	</script>
+</body>
+</html>

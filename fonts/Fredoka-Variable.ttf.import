@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://cqfredokaui001"
-path="res://.godot/imported/Fredoka-Variable.ttf-cqfredokaui001.fontdata"
+uid="uid://c863yh8y0am3y"
+path="res://.godot/imported/Fredoka-Variable.ttf-76fd20b819b5896dc18a1dabf2f4a039.fontdata"
 
 [deps]
 
 source_file="res://fonts/Fredoka-Variable.ttf"
-dest_files=["res://.godot/imported/Fredoka-Variable.ttf-cqfredokaui001.fontdata"]
+dest_files=["res://.godot/imported/Fredoka-Variable.ttf-76fd20b819b5896dc18a1dabf2f4a039.fontdata"]
 
 [params]
 
@@ -21,6 +21,7 @@ msdf_pixel_range=8
 msdf_size=48
 allow_system_fallback=true
 force_autohinter=false
+modulate_color_glyphs=false
 hinting=1
 subpixel_positioning=4
 keep_rounding_remainders=true
@@ -29,4 +30,7 @@ Fallbacks=null
 fallbacks=[]
 Compress=null
 compress=true
-preprocess_size=null
+preload=[]
+language_support={}
+script_support={}
+opentype_features={}

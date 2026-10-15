@@ -9,11 +9,14 @@ extends Node
 
 const MAX_SFX_PLAYERS: int = 10
 const SAMPLE_RATE: int = 22050
+const MENU_MUSIC_PATH := "res://audio/music/menu_farmyard_loop.ogg"
 
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _sfx_index: int = 0
 var _music_player: AudioStreamPlayer
 var _streams: Dictionary = {}
+var _current_music: StringName = &""
+var _music_tween: Tween
 
 
 func _ready() -> void:
@@ -29,6 +32,7 @@ func _ready() -> void:
 
 	if enable_procedural:
 		_build_procedural_bank()
+	_register_music_bank()
 	_apply_volumes()
 
 	EventBus.chicken_shot.connect(_on_chicken_shot)
@@ -44,6 +48,8 @@ func _ready() -> void:
 	EventBus.near_miss.connect(_on_near_miss)
 	EventBus.good_shot.connect(_on_good_shot)
 	EventBus.chicken_react.connect(_on_chicken_react)
+	EventBus.game_state_changed.connect(_on_game_state)
+	call_deferred("_sync_music_to_state")
 
 
 func register_stream(logical_name: StringName, stream: AudioStream) -> void:
@@ -64,17 +70,37 @@ func play_sfx(logical_name: StringName, pitch_scale: float = 1.0, volume_offset_
 func play_music(logical_name: StringName, fade_in: bool = false) -> void:
 	if not _streams.has(logical_name):
 		return
+	var target_db: float = music_volume_db + master_volume_db
+	if _current_music == logical_name and _music_player.playing:
+		_kill_music_tween()
+		_music_player.volume_db = target_db
+		return
+	_kill_music_tween()
+	_current_music = logical_name
 	_music_player.stream = _streams[logical_name]
-	_music_player.volume_db = music_volume_db + master_volume_db
 	_music_player.play()
 	if fade_in:
 		_music_player.volume_db = -40.0
-		var tween := create_tween()
-		tween.tween_property(_music_player, "volume_db", music_volume_db + master_volume_db, 1.0)
+		_music_tween = create_tween()
+		_music_tween.tween_property(_music_player, "volume_db", target_db, 1.0)
+	else:
+		_music_player.volume_db = target_db
 
 
 func stop_music() -> void:
+	_kill_music_tween()
 	_music_player.stop()
+	_current_music = &""
+
+
+func fade_out_music(duration: float = 0.45) -> void:
+	if not _music_player.playing:
+		_current_music = &""
+		return
+	_kill_music_tween()
+	_music_tween = create_tween()
+	_music_tween.tween_property(_music_player, "volume_db", -40.0, duration)
+	_music_tween.tween_callback(stop_music)
 
 
 func set_master_volume_db(value: float) -> void:
@@ -83,9 +109,40 @@ func set_master_volume_db(value: float) -> void:
 
 
 func _apply_volumes() -> void:
-	_music_player.volume_db = music_volume_db + master_volume_db
+	if _music_tween == null or not _music_tween.is_running():
+		_music_player.volume_db = music_volume_db + master_volume_db
 	for player: AudioStreamPlayer in _sfx_players:
 		player.volume_db = sfx_volume_db + master_volume_db
+
+
+func _kill_music_tween() -> void:
+	if _music_tween and _music_tween.is_valid():
+		_music_tween.kill()
+	_music_tween = null
+
+
+func _register_music_bank() -> void:
+	# Prefer raw load so music works before the editor has reimported the asset.
+	var menu: AudioStream = AudioStreamOggVorbis.load_from_file(MENU_MUSIC_PATH)
+	if menu == null and ResourceLoader.exists(MENU_MUSIC_PATH):
+		menu = load(MENU_MUSIC_PATH) as AudioStream
+	if menu == null:
+		push_warning("AudioManager: missing menu music at %s" % MENU_MUSIC_PATH)
+		return
+	if menu is AudioStreamOggVorbis:
+		(menu as AudioStreamOggVorbis).loop = true
+	register_stream(&"menu", menu)
+
+
+func _sync_music_to_state() -> void:
+	_on_game_state(-1, int(GameManager.state))
+
+
+func _on_game_state(_previous: int, next: int) -> void:
+	if next == GameManager.State.MAIN_MENU:
+		play_music(&"menu", true)
+	elif _current_music == &"menu":
+		fade_out_music()
 
 
 # ---------------------------------------------------------------------------

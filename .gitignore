@@ -14,6 +14,12 @@ builds/
 *.pck
 *.zip
 
+# Cloudflare / Wrangler local state (never commit secrets or cache)
+.wrangler/
+.dev.vars
+.env
+.env.*
+
 # Secrets (if you add signed desktop/mobile presets later)
 # Keep export_presets.cfg in git — Web preset has no secrets.
 *.keystore

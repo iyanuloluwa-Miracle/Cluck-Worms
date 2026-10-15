@@ -1,0 +1,14 @@
+name = "withered-bird-1943"
+main = "cloudflare/worker.js"
+compatibility_date = "2024-11-01"
+
+# After deploy: npx wrangler secret put VATAR_SECRET
+# (paste your vtr_test_… key from Lagos Life → Get your keys)
+
+[assets]
+directory = "./builds/web-cf"
+binding = "ASSETS"
+# Required so the Worker can attach Content-Encoding: br on index.wasm.
+run_worker_first = true
+html_handling = "none"
+not_found_handling = "none"

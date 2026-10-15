@@ -216,6 +216,16 @@ func resume_game() -> void:
 	_change_state(State.PLAYING)
 
 
+func grant_extra_life(amount: int = 1) -> void:
+	## Lagos Life IAP / continue pack — restore lives without resetting the run.
+	lives = mini(lives + maxi(amount, 0), starting_lives + 2)
+	EventBus.lives_changed.emit(lives, starting_lives)
+	if state == State.GAME_OVER and lives > 0:
+		is_paused = false
+		_set_tree_paused(false)
+		retry_level()
+
+
 func retry_level() -> void:
 	## Retry current level after LevelComplete overlay is not used —
 	## used from pause/game-over "retry" and life-loss reload.
