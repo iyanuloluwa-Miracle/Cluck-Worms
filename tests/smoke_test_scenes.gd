@@ -4,6 +4,7 @@ extends Node
 func _ready() -> void:
 	print("--- Smoke Testing All Scenes ---")
 	var scenes_to_test: Array[String] = [
+		"res://scenes/ui/LoadingScreen.tscn",
 		"res://scenes/main/Main.tscn",
 		"res://scenes/level/Level.tscn",
 		"res://scenes/chicken/Chicken.tscn",
@@ -19,6 +20,7 @@ func _ready() -> void:
 		"res://scenes/ui/GameOverUI.tscn",
 		"res://scenes/ui/PlayerProfileUI.tscn",
 		"res://scenes/ui/InstructionsUI.tscn",
+		"res://scenes/ui/StatsUI.tscn",
 	]
 	
 	var failed: int = 0

@@ -112,11 +112,15 @@ func _style() -> void:
 	_style_cell(
 		_cell_match,
 		"CLEAR WORMS BY GETTING THREE OR MORE OF THE SAME COLOR IN A ROW.",
-		"LIKE COLORS ATTRACT AND CAN CREATE CHAIN REACTIONS!"
+		"AFTER A MATCH THE CHAIN REVERSES TO CLOSE THE GAP — SET UP CASCADES!"
 	)
 	_style_cell(_cell_nest, "DON'T LET THE WORMS REACH THE NEST!", "")
 	_style_cell(_cell_bonus, "MATCH SPECIAL WORMS FOR BONUS POINTS & POWER-UPS!", "")
-	_style_cell(_cell_swap, "RIGHT MOUSE BUTTON OR SPACE SWAPS YOUR WORMS.", "")
+	_style_cell(
+		_cell_swap,
+		"RIGHT MOUSE / SPACE SWAPS. Q = SLOW PULSE. E = BOMB BLAST.",
+		"ABILITIES USE LIMITED CHARGES — SPEND THEM WISELY!"
+	)
 
 	var footer_style := StyleBoxFlat.new()
 	footer_style.bg_color = FOOTER_BG

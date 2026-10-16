@@ -45,8 +45,19 @@ func _ready() -> void:
 	)
 
 	var catalog := ProgressionCatalog.build_campaign()
-	failed += _expect(catalog.get_stage_count() == 4, "4 stages in campaign")
-	failed += _expect(catalog.get_total_level_count() == 18, "18 campaign levels")
+	failed += _expect(catalog.get_stage_count() == 3, "3 stages in campaign")
+	failed += _expect(catalog.get_total_level_count() == 15, "15 campaign levels")
+	var boss_level := catalog.get_stage(0).get_level(4)
+	failed += _expect(boss_level != null and boss_level.is_boss_level, "stage 1 ends with boss")
+	failed += _expect(
+		catalog.get_stage(0).get_level(2).objective == LevelObjective.Kind.SCORE_TARGET,
+		"stage 1 level 3 is score target"
+	)
+	failed += _expect(
+		catalog.get_stage(1).get_level(1).objective == LevelObjective.Kind.SURVIVE_TIME,
+		"stage 2 has survive objective"
+	)
+	failed += _expect(AchievementCatalog.all_ids().has(&"boss_slayer"), "boss_slayer achievement exists")
 
 	if failed == 0:
 		print("Cluck & Worms core tests: ALL PASSED")

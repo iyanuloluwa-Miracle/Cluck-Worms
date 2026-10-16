@@ -57,7 +57,7 @@ func update_trajectory(
 	if chain != null and is_instance_valid(chain):
 		var worms: Array[Worm] = chain.get_worms()
 		for worm: Worm in worms:
-			if not is_instance_valid(worm) or not worm.is_active_in_chain():
+			if not chain.is_worm_targetable(worm):
 				continue
 			var to_worm: Vector2 = worm.global_position - muzzle_global
 			var proj: float = to_worm.dot(aim_dir)

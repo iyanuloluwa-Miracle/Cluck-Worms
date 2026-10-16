@@ -35,13 +35,37 @@ var _pending_gauntlet_banner: bool = false
 var _gauntlet_banner_tween: Tween
 var _stage_index_display: int = 1
 var _level_number_display: int = 1
+var _boss_panel: PanelContainer
+var _boss_label: Label
+var _boss_bar: ProgressBar
+var _boss_visible: bool = false
+var _boss_status: Label
+var _boss_fill: StyleBoxFlat
+var _boss_name: String = "BOSS"
+var _boss_phase: int = 1
+var _boss_damage_ratio: float = 0.0
+var _objective_ratio: float = 0.0
+var _tracked_chain: WormChain
+var _intro_box: VBoxContainer
+var _intro_kicker: Label
+var _intro_title: Label
+var _intro_sub: Label
+var _intro_tween: Tween
+var _objective_label: Label
+var _ability_row: HBoxContainer
+var _slow_btn: Button
+var _bomb_btn: Button
+var _toast: Label
+var _toast_tween: Tween
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	_style_navbar(false)
+	_ensure_boss_hud()
 	_menu_btn.pressed.connect(_on_pause)
+	_menu_btn.focus_mode = Control.FOCUS_NONE
 	EventBus.score_changed.connect(_on_score)
 	EventBus.combo_changed.connect(_on_combo)
 	EventBus.lives_changed.connect(_on_lives)
@@ -54,6 +78,23 @@ func _ready() -> void:
 	EventBus.danger_warning.connect(_on_danger)
 	EventBus.chain_worms_removed.connect(_on_worms_removed)
 	EventBus.gauntlet_run_started.connect(_on_gauntlet_run_started)
+	EventBus.boss_introduced.connect(_on_boss_introduced)
+	EventBus.boss_health_changed.connect(_on_boss_health)
+	EventBus.boss_defeated.connect(_on_boss_defeated)
+	EventBus.boss_phase_changed.connect(_on_boss_phase)
+	# Space swaps worms in play; a lingering focused button would swallow it.
+	EventBus.game_state_changed.connect(func(_prev: int, next: int) -> void:
+		if next == GameManager.State.PLAYING and is_inside_tree():
+			get_viewport().gui_release_focus()
+	)
+	EventBus.boss_status_changed.connect(_on_boss_status)
+	EventBus.chain_reversing.connect(_on_chain_reversing)
+	EventBus.ability_charges_changed.connect(_on_ability_charges)
+	EventBus.ability_used.connect(_on_ability_used)
+	EventBus.objective_progress_changed.connect(_on_objective_progress)
+	EventBus.achievement_unlocked.connect(_on_achievement)
+	EventBus.tutorial_step.connect(_on_tip)
+	_ensure_meta_hud()
 	_on_combo(0)
 	if _gauntlet_banner:
 		_gauntlet_banner.visible = false
@@ -159,7 +200,7 @@ func _style_navbar(gauntlet: bool) -> void:
 	_combo.add_theme_font_size_override("font_size", 22 if gauntlet else 20)
 	_combo.add_theme_color_override("font_color", EMBER_HOT if gauntlet else UITheme.YOLK)
 	_combo.add_theme_constant_override("outline_size", 4)
-	_combo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_combo.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	UITheme.apply_font(_status, UITheme.WEIGHT_BOLD if gauntlet else UITheme.WEIGHT_SEMIBOLD)
 	_status.add_theme_font_size_override("font_size", 16)
@@ -249,7 +290,7 @@ func _format_score(n: int) -> String:
 
 
 func _on_combo(combo: int) -> void:
-	if combo <= 0:
+	if combo <= 1:
 		var tween := create_tween()
 		tween.tween_property(_combo, "modulate:a", 0.0, 0.18)
 		return
@@ -283,29 +324,350 @@ func _on_lives(lives: int, max_lives: int) -> void:
 	_lives.text = icons
 
 
+func _ensure_meta_hud() -> void:
+	var safe: Control = $Root/Safe
+	if _objective_label == null:
+		_objective_label = Label.new()
+		_objective_label.name = "ObjectiveLabel"
+		_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_objective_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		_objective_label.offset_top = 72.0
+		_objective_label.offset_bottom = 96.0
+		_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.apply_font(_objective_label, UITheme.WEIGHT_BOLD)
+		_objective_label.add_theme_font_size_override("font_size", 15)
+		_objective_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.85))
+		_objective_label.add_theme_color_override("font_outline_color", Color(0.05, 0.1, 0.05, 0.85))
+		_objective_label.add_theme_constant_override("outline_size", 4)
+		_objective_label.visible = not _boss_visible
+		safe.add_child(_objective_label)
+	if _ability_row == null:
+		_ability_row = HBoxContainer.new()
+		_ability_row.name = "AbilityRow"
+		_ability_row.mouse_filter = Control.MOUSE_FILTER_STOP
+		_ability_row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		_ability_row.offset_left = 8.0
+		_ability_row.offset_top = -78.0
+		_ability_row.offset_right = 280.0
+		_ability_row.offset_bottom = -18.0
+		_ability_row.add_theme_constant_override("separation", 10)
+		_slow_btn = _make_ability_button("SLOW [Q]", Color(0.25, 0.55, 0.85))
+		_bomb_btn = _make_ability_button("BOMB [E]", Color(0.75, 0.28, 0.18))
+		_slow_btn.pressed.connect(func() -> void: GameManager.try_use_slow_ability())
+		_bomb_btn.pressed.connect(func() -> void: GameManager.try_use_bomb_ability())
+		_ability_row.add_child(_slow_btn)
+		_ability_row.add_child(_bomb_btn)
+		safe.add_child(_ability_row)
+	if _toast == null:
+		_toast = Label.new()
+		_toast.name = "AchievementToast"
+		_toast.visible = false
+		_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_toast.offset_left = -220.0
+		_toast.offset_right = 220.0
+		_toast.offset_top = 140.0
+		_toast.offset_bottom = 180.0
+		_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.apply_font(_toast, UITheme.WEIGHT_BOLD)
+		_toast.add_theme_font_size_override("font_size", 22)
+		_toast.add_theme_color_override("font_color", GOLD)
+		_toast.add_theme_color_override("font_outline_color", Color(0.1, 0.05, 0.0, 0.9))
+		_toast.add_theme_constant_override("outline_size", 6)
+		safe.add_child(_toast)
+
+
+func _make_ability_button(text: String, fill: Color) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(120, 48)
+	# Q / E trigger abilities; focusable buttons would steal Space (swap) after a click.
+	btn.focus_mode = Control.FOCUS_NONE
+	var n := _inset(fill, 10, Color(1, 1, 1, 0.35))
+	var h := n.duplicate() as StyleBoxFlat
+	h.bg_color = fill.lightened(0.15)
+	btn.add_theme_stylebox_override("normal", n)
+	btn.add_theme_stylebox_override("hover", h)
+	btn.add_theme_stylebox_override("pressed", h)
+	btn.add_theme_stylebox_override("disabled", _inset(fill.darkened(0.35), 10, Color(0, 0, 0, 0.35)))
+	UITheme.apply_font(btn, UITheme.WEIGHT_BOLD)
+	btn.add_theme_font_size_override("font_size", 14)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	return btn
+
+
+func _on_ability_charges(slow_c: int, bomb_c: int) -> void:
+	_ensure_meta_hud()
+	_slow_btn.text = "SLOW ×%d [Q]" % slow_c
+	_bomb_btn.text = "BOMB ×%d [E]" % bomb_c
+	_slow_btn.disabled = slow_c <= 0
+	_bomb_btn.disabled = bomb_c <= 0
+
+
+func _on_ability_used(ability_id: StringName) -> void:
+	_status.text = "Used %s!" % String(ability_id).to_upper()
+	_status.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	_status.modulate.a = 1.0
+
+
+func _on_objective_progress(label: String, _ratio: float) -> void:
+	_ensure_meta_hud()
+	if _objective_label:
+		_objective_label.text = label
+	_objective_ratio = _ratio
+	_update_progress_bar()
+
+
+func _on_achievement(id: StringName) -> void:
+	_ensure_meta_hud()
+	_toast.text = "★ %s" % AchievementCatalog.title(id)
+	_toast.visible = true
+	_toast.modulate.a = 0.0
+	if _toast_tween:
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.2)
+	_toast_tween.tween_interval(2.2)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.4)
+	_toast_tween.tween_callback(func() -> void: _toast.visible = false)
+
+
+func _on_tip(step_id: StringName) -> void:
+	_status.text = String(step_id)
+	_status.add_theme_color_override("font_color", Color(0.95, 0.92, 0.7))
+	_status.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_interval(3.2)
+	tween.tween_property(_status, "modulate:a", 0.0, 0.5)
+
+
+func _ensure_boss_hud() -> void:
+	if _boss_panel != null:
+		return
+	var safe: Control = $Root/Safe
+	_boss_panel = PanelContainer.new()
+	_boss_panel.name = "BossPanel"
+	_boss_panel.visible = false
+	_boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_boss_panel.offset_left = 220.0
+	_boss_panel.offset_right = -220.0
+	# Compact strip above PathFactory.BOSS_TOP_SAFE; replaces the objective line.
+	_boss_panel.offset_top = 70.0
+	_boss_panel.offset_bottom = 118.0
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	_boss_panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 1)
+	margin.add_child(vbox)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	vbox.add_child(row)
+	_boss_label = Label.new()
+	_boss_label.text = "BOSS"
+	UITheme.apply_font(_boss_label, UITheme.WEIGHT_BOLD)
+	_boss_label.add_theme_font_size_override("font_size", 15)
+	_boss_label.add_theme_color_override("font_color", GOLD)
+	row.add_child(_boss_label)
+	_boss_bar = ProgressBar.new()
+	_boss_bar.show_percentage = false
+	_boss_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_boss_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_boss_bar.custom_minimum_size = Vector2(0, 14)
+	_boss_bar.max_value = 100.0
+	_boss_bar.value = 100.0
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.04, 0.03, 0.92)
+	bg.set_corner_radius_all(7)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.92, 0.28, 0.18)
+	fill.set_corner_radius_all(7)
+	_boss_bar.add_theme_stylebox_override("background", bg)
+	_boss_bar.add_theme_stylebox_override("fill", fill)
+	_boss_fill = fill
+	row.add_child(_boss_bar)
+	_boss_status = Label.new()
+	_boss_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_font(_boss_status, UITheme.WEIGHT_BOLD)
+	_boss_status.add_theme_font_size_override("font_size", 13)
+	_boss_status.add_theme_color_override("font_color", Color(0.95, 0.9, 0.8))
+	vbox.add_child(_boss_status)
+	_boss_panel.add_theme_stylebox_override("panel", _inset(Color(0.12, 0.06, 0.04, 0.92), 12, Color(0.85, 0.45, 0.15, 0.65)))
+	safe.add_child(_boss_panel)
+
+
+func _set_boss_hud_visible(show_boss: bool) -> void:
+	_boss_visible = show_boss
+	if _boss_panel:
+		_boss_panel.visible = show_boss
+	if _objective_label:
+		_objective_label.visible = not show_boss
+
+
+func _on_boss_phase(_id: StringName, phase: int) -> void:
+	_ensure_boss_hud()
+	_boss_phase = phase
+	_boss_label.text = "%s  ·  PHASE %d" % [_boss_name, phase] if phase > 1 else _boss_name
+
+
+func _on_boss_status(_id: StringName, status: StringName, detail: String) -> void:
+	_ensure_boss_hud()
+	_boss_status.text = detail
+	var col := Color(0.95, 0.9, 0.8)
+	var bar_col := Color(0.92, 0.28, 0.18)
+	match status:
+		&"weak":
+			col = Color(1.0, 0.95, 0.4)
+			bar_col = Color(1.0, 0.78, 0.2)
+		&"shielded":
+			col = Color(0.65, 0.85, 1.0)
+			bar_col = Color(0.45, 0.6, 0.85)
+		&"attacking":
+			col = Color(1.0, 0.5, 0.3)
+	_boss_status.add_theme_color_override("font_color", col)
+	if _boss_fill:
+		_boss_fill.bg_color = bar_col
+
+
+func _on_boss_introduced(_id: StringName, display_name: String) -> void:
+	_ensure_boss_hud()
+	_boss_name = display_name.to_upper()
+	_boss_label.text = _boss_name
+	_set_boss_hud_visible(true)
+	_status.text = "%s approaches!" % display_name
+	_status.add_theme_color_override("font_color", GOLD)
+	_status.modulate.a = 1.0
+
+
+func _on_boss_health(_id: StringName, current: float, maximum: float) -> void:
+	_ensure_boss_hud()
+	_boss_bar.max_value = maxf(maximum, 1.0)
+	_boss_bar.value = clampf(current, 0.0, _boss_bar.max_value)
+	_boss_damage_ratio = 1.0 - _boss_bar.value / _boss_bar.max_value
+	_update_progress_bar()
+	_set_boss_hud_visible(true)
+
+
+func _on_boss_defeated(_id: StringName) -> void:
+	_status.text = "Boss defeated!"
+	_status.add_theme_color_override("font_color", UITheme.SUCCESS)
+	_status.modulate.a = 1.0
+	if _boss_bar:
+		_boss_bar.value = 0.0
+
+
+func _on_chain_reversing(_chain: WormChain) -> void:
+	_status.text = "Chain reverse!"
+	_status.add_theme_color_override("font_color", Color(0.55, 0.9, 1.0))
+	_status.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_interval(0.9)
+	tween.tween_property(_status, "modulate:a", 0.0, 0.35)
+
+
 func _on_level_started(_id: StringName, _display_name: String) -> void:
 	_apply_run_theme()
 	_stage_index_display = GameManager.stage_index + 1
 	_level_number_display = 1
+	var is_boss := false
 	if GameManager.current_level_def:
 		_level_number_display = GameManager.current_level_def.level_number
 		_total_worms = GameManager.current_level_def.total_worms
+		is_boss = GameManager.current_level_def.is_boss_level
 	else:
 		_total_worms = 0
 	_worms_cleared = 0
+	_objective_ratio = 0.0
+	_tracked_chain = null
+	if not is_boss:
+		_boss_damage_ratio = 0.0
+	# Boss signals can fire before level_started; only hide on non-boss levels.
+	if not is_boss:
+		_set_boss_hud_visible(false)
 	# Compact Zuma-style LVL stamp (stage-level within campaign numbering).
 	var stage_part: int = _stage_index_display
 	var level_in_stage: int = GameManager.level_index + 1
 	if GameManager.is_gauntlet_run:
 		_level.text = "G-%d" % _level_number_display
+	elif is_boss:
+		_level.text = "BOSS %d" % stage_part
 	else:
 		_level.text = "LVL %d-%d" % [stage_part, level_in_stage]
 	_status.text = ""
 	_danger_urgency = 0.0
 	_update_progress_bar()
+	if not is_boss:
+		_show_level_intro()
 
 
-func _on_worms_removed(_chain: WormChain, _index: int, count: int) -> void:
+func _show_level_intro() -> void:
+	var def: LevelData = GameManager.current_level_def
+	if def == null:
+		return
+	_ensure_intro_banner()
+	var stage: StageDef = GameManager.get_current_stage()
+	var kicker: String
+	var hold: float = 1.6
+	if GameManager.is_gauntlet_run:
+		kicker = "GAUNTLET"
+	elif GameManager.level_index == 0 and stage != null:
+		kicker = "STAGE %d  ·  %s" % [GameManager.stage_index + 1, stage.display_name.to_upper()]
+		hold = 2.4
+	else:
+		kicker = "LEVEL %d-%d" % [GameManager.stage_index + 1, GameManager.level_index + 1]
+	_intro_kicker.text = kicker
+	_intro_title.text = def.display_name
+	_intro_sub.text = LevelObjective.display_name(def.objective)
+	if _intro_tween:
+		_intro_tween.kill()
+	_intro_box.modulate.a = 0.0
+	_intro_box.pivot_offset = _intro_box.size * 0.5
+	_intro_tween = _intro_box.create_tween()
+	_intro_tween.tween_property(_intro_box, "modulate:a", 1.0, 0.25)
+	_intro_tween.parallel().tween_property(_intro_box, "scale", Vector2.ONE, 0.35).from(Vector2(0.85, 0.85)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_intro_tween.tween_interval(hold)
+	_intro_tween.tween_property(_intro_box, "modulate:a", 0.0, 0.4)
+
+
+func _ensure_intro_banner() -> void:
+	if _intro_box != null:
+		return
+	_intro_box = VBoxContainer.new()
+	_intro_box.name = "LevelIntro"
+	_intro_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_intro_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_intro_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_intro_box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_intro_box.offset_top = -150.0
+	_intro_box.offset_bottom = -40.0
+	_intro_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_intro_box.add_theme_constant_override("separation", 0)
+	_intro_kicker = _intro_label(20, Color(1.0, 0.8, 0.4))
+	_intro_title = _intro_label(52, UITheme.YOLK_HOT)
+	_intro_sub = _intro_label(18, UITheme.CREAM)
+	_intro_box.modulate.a = 0.0
+	$Root/Safe.add_child(_intro_box)
+
+
+func _intro_label(font_size: int, color: Color) -> Label:
+	var l := Label.new()
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UITheme.apply_font(l, UITheme.WEIGHT_BOLD)
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color(0.06, 0.04, 0.02, 0.92))
+	l.add_theme_constant_override("outline_size", maxi(5, font_size / 6))
+	_intro_box.add_child(l)
+	return l
+
+
+func _on_worms_removed(chain: WormChain, _index: int, count: int) -> void:
+	_tracked_chain = chain
 	_worms_cleared += count
 	_update_progress_bar()
 
@@ -313,8 +675,21 @@ func _on_worms_removed(_chain: WormChain, _index: int, count: int) -> void:
 func _update_progress_bar() -> void:
 	if _progress_bar == null:
 		return
-	_progress_bar.max_value = maxf(float(_total_worms), 1.0)
-	_progress_bar.value = clampf(float(_worms_cleared), 0.0, _progress_bar.max_value)
+	_progress_bar.max_value = 1.0
+	_progress_bar.step = 0.0
+	var ratio: float = _objective_ratio
+	var def: LevelData = GameManager.current_level_def
+	if def != null:
+		match def.objective:
+			LevelObjective.Kind.CLEAR_CHAIN, LevelObjective.Kind.LIMITED_SHOTS:
+				# Inserts grow the chain, so measure against what's actually left.
+				var remaining: int = _total_worms
+				if _tracked_chain != null and is_instance_valid(_tracked_chain):
+					remaining = _tracked_chain.get_worm_count() + _tracked_chain.spawns_remaining
+				ratio = float(_worms_cleared) / maxf(float(_worms_cleared + remaining), 1.0)
+			LevelObjective.Kind.DEFEAT_BOSS:
+				ratio = _boss_damage_ratio
+	_progress_bar.value = clampf(ratio, 0.0, 1.0)
 
 
 func _on_loadout(_current: WormColor.Kind, next_color: WormColor.Kind) -> void:

@@ -8,8 +8,40 @@ extends Resource
 @export var display_name: String = "Level 1"
 @export var scene_path: String = "res://scenes/level/Level.tscn"
 
-## Global campaign index (1–12). Used for UI / debugging.
+## Global campaign index (1–N). Used for UI / debugging / unlocks.
 @export var level_number: int = 1
+
+@export_group("Boss")
+## When set, this level is a stage boss encounter.
+@export var boss: BossDef = null
+@export var is_boss_level: bool = false
+
+@export_group("Objective")
+@export var objective: LevelObjective.Kind = LevelObjective.Kind.CLEAR_CHAIN
+## Score goal for SCORE_TARGET levels.
+@export var target_score: int = 0
+## Survive duration (seconds) for SURVIVE_TIME levels.
+@export var survive_seconds: float = 0.0
+## Max shots for LIMITED_SHOTS levels (0 = unlimited).
+@export var shot_limit: int = 0
+## Required peak combo for COMBO_TARGET levels.
+@export var target_combo: int = 0
+## Short tip shown when the level starts.
+@export var intro_tip: String = ""
+
+@export_group("Modifiers")
+## Multiplies march speed after base tuning (1 = unchanged).
+@export_range(0.5, 2.0, 0.05) var speed_multiplier: float = 1.0
+## Gradually increases march speed over the level.
+@export var accelerating_chain: bool = false
+## Caps available projectile / spawn colors (0 = use color_count).
+@export_range(0, 6) var color_cap: int = 0
+## Disables special worm spawns for this level.
+@export var no_specials: bool = false
+## Grants extra ability charges at level start.
+@export var bonus_ability_charges: int = 0
+## Restricts chicken loadout to fewer random colors mid-level feel.
+@export var tight_palette: bool = false
 
 @export_group("Path")
 ## Waypoints in playfield space (1280×720). Handles are auto-smoothed.

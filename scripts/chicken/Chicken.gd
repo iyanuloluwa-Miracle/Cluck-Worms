@@ -126,6 +126,7 @@ func _ready() -> void:
 	_refresh_previews()
 	EventBus.chicken_loadout_changed.emit(current_color, next_color)
 	EventBus.chicken_react.connect(_on_react)
+	EventBus.chain_worms_removed.connect(_on_chain_worms_removed)
 	_idle_peck_timer = GameManager.get_rng().randf_range(2.5, 5.0)
 
 
@@ -295,22 +296,60 @@ func _try_shoot() -> void:
 
 func _advance_loadout() -> void:
 	current_color = next_color
-	next_color = GameManager.roll_worm_color()
+	next_color = _roll_shot_color()
 	# Mild anti-frustration: avoid identical current/next too often.
-	var colors: int = GameManager.get_active_color_count()
 	if next_color == current_color and GameManager.get_rng().randf() < 0.65:
-		var step: int = 1 + GameManager.get_rng().randi_range(0, maxi(colors - 2, 0))
-		next_color = ((int(next_color) + step) % colors) as WormColor.Kind
+		next_color = _roll_shot_color()
 	_refresh_previews()
 	EventBus.chicken_loadout_changed.emit(current_color, next_color)
 
 
 func _roll_initial_loadout() -> void:
-	var colors: int = GameManager.get_active_color_count()
-	current_color = GameManager.roll_worm_color()
-	next_color = GameManager.roll_worm_color()
-	if next_color == current_color:
-		next_color = ((int(current_color) + 1 + (colors / 2)) % colors) as WormColor.Kind
+	current_color = _roll_shot_color()
+	next_color = _roll_shot_color()
+
+
+## Zuma rule: only deal colors still on the chain, so no shot is ever dead.
+func _roll_shot_color() -> WormColor.Kind:
+	if _chain != null and is_instance_valid(_chain):
+		var present: Array[int] = _chain.get_present_colors()
+		if not present.is_empty():
+			return present[GameManager.get_rng().randi_range(0, present.size() - 1)] as WormColor.Kind
+	return GameManager.roll_worm_color()
+
+
+func _on_chain_worms_removed(chain: WormChain, _index: int, _count: int) -> void:
+	if chain != _chain:
+		return
+	var present: Array[int] = chain.get_present_colors()
+	if present.is_empty():
+		return
+	var changed: bool = false
+	if not present.has(int(current_color)):
+		current_color = _roll_shot_color()
+		changed = true
+	if not present.has(int(next_color)):
+		next_color = _roll_shot_color()
+		changed = true
+	if changed:
+		_refresh_previews()
+		EventBus.chicken_loadout_changed.emit(current_color, next_color)
+
+
+## Point the shooter at [param world_pos] immediately (automation / tests).
+func aim_at(world_pos: Vector2) -> void:
+	_pointer_pos = world_pos
+	_has_pointer = true
+	_target_angle = (world_pos - global_position).angle()
+	_aim_angle = _target_angle
+	_aim_pivot.rotation = _aim_angle
+
+
+## Fire immediately if allowed. Returns true when a projectile launched.
+func shoot_now() -> bool:
+	var before: float = _cooldown_left
+	_try_shoot()
+	return _cooldown_left > before
 
 
 # ---------------------------------------------------------------------------

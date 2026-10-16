@@ -149,4 +149,4 @@ func _apply_ember_ghost(btn: Button, label: String) -> void:
 	btn.add_theme_stylebox_override("normal", n)
 	btn.add_theme_stylebox_override("hover", n)
 	btn.add_theme_stylebox_override("pressed", n)
-	btn.add_theme_stylebox_override("focus", n)
+	btn.add_theme_stylebox_override("focus", UITheme.focus_ring())

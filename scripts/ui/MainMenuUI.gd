@@ -2,6 +2,7 @@ extends Control
 ## Zuma-inspired welcome — greeting up top, stone tablet menu on the right.
 
 @onready var _atmosphere: Control = $Atmosphere
+var _logo: GameLogo
 @onready var _root: Control = $SafeArea/Root
 @onready var _brand: Control = $SafeArea/Root/BrandBlock
 @onready var _leaderboard: PanelContainer = $SafeArea/Root/Leaderboard
@@ -52,12 +53,14 @@ var _awaiting_instructions_after_profile: bool = false
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_ensure_logo()
 	_style()
 	_adventure_btn.pressed.connect(_on_adventure)
 	_gauntlet_btn.pressed.connect(_on_gauntlet)
 	_options_btn.pressed.connect(_on_settings)
 	_howto_btn.pressed.connect(_on_howto)
 	_quit_btn.pressed.connect(_on_quit)
+	call_deferred("_ensure_extra_menu_buttons")
 	if _switch_btn:
 		_switch_btn.pressed.connect(_on_switch_player)
 	_adventure_btn.button_down.connect(func() -> void: UIFx.punch_button(_adventure_btn))
@@ -230,16 +233,17 @@ func _stone_style(fill: Color, lit: bool = false, pressed: bool = false) -> Styl
 func _refresh_greeting() -> void:
 	var pname: String = SaveService.current_player_name.to_upper()
 	if _welcome_label:
-		_welcome_label.text = "WELCOME TO CLUCK & WORMS, %s!" % pname
+		_welcome_label.text = "WELCOME BACK, %s!" % pname
 		UITheme.apply_font(_welcome_label, UITheme.WEIGHT_BOLD)
-		_welcome_label.add_theme_font_size_override("font_size", 24)
+		_welcome_label.add_theme_font_size_override("font_size", 18)
 		_welcome_label.add_theme_color_override("font_color", STONE_GOLD)
 		_welcome_label.add_theme_color_override("font_outline_color", Color(0.08, 0.12, 0.04, 0.9))
 		_welcome_label.add_theme_constant_override("outline_size", 5)
 	if _switch_btn:
 		_switch_btn.text = "(IF THIS IS NOT YOU, CLICK HERE.)"
 		UITheme.apply_font(_switch_btn, UITheme.WEIGHT_SEMIBOLD)
-		_switch_btn.add_theme_font_size_override("font_size", 13)
+		_switch_btn.add_theme_font_size_override("font_size", 12)
+		_switch_btn.custom_minimum_size = Vector2(0, 20)
 		_switch_btn.add_theme_color_override("font_color", Color(0.92, 0.95, 0.85, 0.88))
 		_switch_btn.add_theme_color_override("font_hover_color", STONE_GOLD)
 		_switch_btn.flat = true
@@ -286,7 +290,34 @@ func _on_profile_changed(_player_name: String) -> void:
 
 
 func _refresh_high_score(high: int) -> void:
-	_high_score.text = "Best  %s" % _format_score(high)
+	var stars: int = 0
+	var total: int = 0
+	var cleared: int = 0
+	if GameManager.catalog:
+		for stage: StageDef in GameManager.catalog.stages:
+			for level: LevelData in stage.levels:
+				var s: int = SaveService.get_level_stars(level.id)
+				stars += s
+				total += 3
+				if SaveService.get_level_best_score(level.id) > 0 or s > 0:
+					cleared += 1
+	var levels: int = int(total / 3.0)
+	_high_score.text = "Best %s   ·   ★ %d / %d   ·   %d / %d levels cleared" % [
+		_format_score(high), stars, total, cleared, levels]
+
+
+func _ensure_logo() -> void:
+	if _logo != null:
+		return
+	_logo = GameLogo.new()
+	_logo.name = "GameLogo"
+	_brand.add_child(_logo)
+	_brand.move_child(_logo, 0)
+	# Logo leads; the greeting becomes a slimmer plaque beneath it.
+	_tagline.visible = false
+	if _brand is Control:
+		(_brand as Control).offset_top = -6.0
+		(_brand as Control).offset_bottom = 200.0
 
 
 func _refresh_leaderboard() -> void:
@@ -361,6 +392,10 @@ func _on_state(_prev: int, next: int) -> void:
 		visible = true
 		modulate.a = 1.0
 		_refresh_leaderboard()
+		_refresh_high_score(SaveService.high_score)
+		if _logo:
+			_logo.replay()
+		_adventure_btn.call_deferred("grab_focus")
 		_play_entrance()
 	else:
 		_stop_play_pulse()
@@ -467,6 +502,59 @@ func _on_adventure() -> void:
 		sel.open_select()
 
 
+func _ensure_extra_menu_buttons() -> void:
+	var cta: Control = _cta
+	if cta == null or cta.has_node("ChallengeRow"):
+		return
+	var row := HBoxContainer.new()
+	row.name = "ChallengeRow"
+	row.add_theme_constant_override("separation", 10)
+	# Insert above Options.
+	var opts_i: int = _options_btn.get_index()
+	cta.add_child(row)
+	cta.move_child(row, opts_i)
+	var daily := Button.new()
+	daily.name = "DailyButton"
+	daily.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_stone_button(daily, "DAILY", STONE_TEAL.lightened(0.08), STONE_TEAL_HOT, 16, 52)
+	daily.pressed.connect(_on_daily)
+	row.add_child(daily)
+	var practice := Button.new()
+	practice.name = "PracticeButton"
+	practice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_stone_button(practice, "PRACTICE", STONE_TEAL.darkened(0.05), STONE_TEAL_HOT, 16, 52)
+	practice.pressed.connect(_on_practice)
+	row.add_child(practice)
+	var stats := Button.new()
+	stats.name = "StatsButton"
+	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_stone_button(stats, "STATS", STONE_TEAL, STONE_TEAL_HOT, 16, 52)
+	stats.pressed.connect(_on_stats)
+	row.add_child(stats)
+
+
+func _on_daily() -> void:
+	UIFx.punch_button(_adventure_btn)
+	visible = false
+	GameManager.start_daily_challenge()
+
+
+func _on_practice() -> void:
+	UIFx.punch_button(_adventure_btn)
+	visible = false
+	# Practice the furthest unlocked stage's first unfinished-ish level.
+	var lvl_n: int = clampi(SaveService.max_level_unlocked, 1, 15)
+	var stage_i: int = mini((lvl_n - 1) / 5, 2)
+	var level_i: int = (lvl_n - 1) % 5
+	GameManager.start_practice(stage_i, level_i)
+
+
+func _on_stats() -> void:
+	var stats_ui: Node = get_tree().root.find_child("StatsUI", true, false)
+	if stats_ui and stats_ui.has_method("open_stats"):
+		stats_ui.open_stats()
+
+
 func _on_gauntlet() -> void:
 	UIFx.punch_button(_gauntlet_btn)
 	# Jump into the highest unlocked level — arcade-style gauntlet run.
@@ -489,6 +577,7 @@ func _on_campaign_closed() -> void:
 		visible = true
 		modulate.a = 1.0
 		_play_entrance()
+		_adventure_btn.call_deferred("grab_focus")
 
 
 func _on_settings() -> void:

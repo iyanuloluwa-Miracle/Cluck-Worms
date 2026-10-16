@@ -18,6 +18,8 @@ var _configured: bool = false
 @onready var _fx: Node2D = $FX
 @onready var _camera: Camera2D = $LevelCamera
 
+var _boss: BossController = null
+
 
 func _ready() -> void:
 	if path_node == null:
@@ -43,8 +45,12 @@ func _ready() -> void:
 	chain_node.is_marching = false
 	_seed_initial_chain()
 	if _level_data != null:
-		chain_node.configure_spawn_budget(_level_data.get_remaining_spawns_after_initial())
-		chain_node.auto_spawn = _level_data.auto_spawn and chain_node.spawns_remaining != 0
+		if GameManager.challenge_mode == &"practice":
+			chain_node.spawns_remaining = -1
+			chain_node.auto_spawn = true
+		else:
+			chain_node.configure_spawn_budget(_level_data.get_remaining_spawns_after_initial())
+			chain_node.auto_spawn = _level_data.auto_spawn and chain_node.spawns_remaining != 0
 	else:
 		chain_node.auto_spawn = was_auto
 	chain_node.is_marching = true
@@ -61,6 +67,7 @@ func _ready() -> void:
 	# Keep FX host warm so first pop isn't delayed.
 	if _fx:
 		_fx.z_index = 20
+	_spawn_boss_if_needed()
 
 
 ## Preferred entry: call on the instance BEFORE add_child so _ready seeds correctly.
@@ -99,7 +106,7 @@ func _apply_data_internal(data: LevelData) -> void:
 		path_node.curve = data.build_curve()
 
 	if chain_node:
-		chain_node.march_speed = data.march_speed
+		chain_node.march_speed = data.march_speed * data.speed_multiplier
 		chain_node.spawn_interval = data.spawn_interval
 		chain_node.auto_spawn = data.auto_spawn
 		chain_node.worm_spacing = data.worm_spacing
@@ -108,7 +115,21 @@ func _apply_data_internal(data: LevelData) -> void:
 		chicken_node.position = data.chicken_position
 
 	var bg: ColorRect = get_node_or_null("Background/ColorRect") as ColorRect
-	if bg:
+	var backdrop_host: Node = get_node_or_null("Background")
+	if backdrop_host:
+		var backdrop := backdrop_host.get_node_or_null("StageBackdrop") as StageBackdrop
+		if backdrop == null:
+			backdrop = StageBackdrop.new()
+			backdrop.name = "StageBackdrop"
+			backdrop_host.add_child(backdrop)
+			backdrop_host.move_child(backdrop, 1)
+		backdrop.configure(data.level_number, data.is_boss_level)
+		var overlay: CanvasItem = backdrop_host.get_node_or_null("GradientOverlay") as CanvasItem
+		if overlay:
+			overlay.visible = false
+		if bg:
+			bg.color = backdrop.base_color()
+	elif bg:
 		bg.color = data.background_color
 
 	var guide: Node = get_node_or_null("PathGuide")
@@ -122,17 +143,14 @@ func _apply_data_internal(data: LevelData) -> void:
 func _seed_initial_chain() -> void:
 	for i: int in range(initial_worm_count):
 		chain_node.spawn_rear(GameManager.roll_worm_color())
-	var worms: Array[Worm] = chain_node.get_worms()
-	if worms.is_empty():
+	if chain_node.get_worm_count() == 0:
 		return
+	# Zuma roll-in: the train rushes out of the tunnel, capped at 35% of the path.
 	var lead_offset: float = float(initial_worm_count) * chain_node.worm_spacing
-	# Keep the train on the path — clamp so leader isn't past the midpoint.
 	var path_len: float = chain_node.get_path_length()
 	if path_len > 0.0:
 		lead_offset = minf(lead_offset, path_len * 0.35)
-	for worm: Worm in worms:
-		worm.path_distance += lead_offset
-		worm.target_path_distance += lead_offset
+	chain_node.begin_intro_roll(lead_offset)
 
 
 func _on_reached_end(_chain: WormChain) -> void:
@@ -141,8 +159,28 @@ func _on_reached_end(_chain: WormChain) -> void:
 
 
 func _on_cleared(_chain: WormChain) -> void:
+	# On boss stages, a premature chain clear must not soft-lock — keep pressure up.
+	if _level_data != null and _level_data.is_boss_level:
+		if _boss == null or not _boss.is_defeated:
+			chain_node.spawns_remaining = maxi(chain_node.spawns_remaining, 12)
+			chain_node.auto_spawn = true
+			chain_node.is_marching = true
+			if chicken_node:
+				chicken_node.set_shooting_enabled(GameManager.can_player_act())
+			return
 	if chicken_node:
 		chicken_node.set_shooting_enabled(false)
+
+
+func _spawn_boss_if_needed() -> void:
+	if _level_data == null or not _level_data.is_boss_level or _level_data.boss == null:
+		return
+	if _boss != null and is_instance_valid(_boss):
+		_boss.queue_free()
+	_boss = BossController.new()
+	_boss.name = "BossController"
+	add_child(_boss)
+	_boss.setup(_level_data.boss, chain_node)
 
 
 func _on_game_state(_prev: int, next: int) -> void:

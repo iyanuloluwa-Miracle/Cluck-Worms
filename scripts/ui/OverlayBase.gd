@@ -48,6 +48,26 @@ func show_overlay() -> void:
 		UIFx.pop_in(_panel, 0.34)
 	else:
 		UIFx.fade_in(self, 0.25)
+	focus_default()
+
+
+## Keyboard / gamepad: focus the first visible, enabled button in the overlay.
+func focus_default() -> void:
+	var btn: Button = _first_button(_panel if _panel else self)
+	if btn:
+		btn.grab_focus()
+
+
+func _first_button(root: Node) -> Button:
+	for child: Node in root.get_children():
+		if child is Button:
+			var b := child as Button
+			if b.is_visible_in_tree() and not b.disabled and b.focus_mode != Control.FOCUS_NONE:
+				return b
+		var nested: Button = _first_button(child)
+		if nested:
+			return nested
+	return null
 
 
 func hide_overlay() -> void:

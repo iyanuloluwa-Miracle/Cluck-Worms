@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bmaincluck001"]
+[gd_scene load_steps=11 format=3 uid="uid://bmaincluck001"]
 
 [ext_resource type="Script" path="res://scripts/main/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" uid="uid://bmainmenu001" path="res://scenes/ui/MainMenuUI.tscn" id="2_menu"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://bgameover001" path="res://scenes/ui/GameOverUI.tscn" id="7_go"]
 [ext_resource type="PackedScene" uid="uid://blevelselect001" path="res://scenes/ui/LevelSelectUI.tscn" id="8_ls"]
 [ext_resource type="PackedScene" uid="uid://bsettings001" path="res://scenes/ui/SettingsUI.tscn" id="9_set"]
+[ext_resource type="PackedScene" uid="uid://bstatsui001" path="res://scenes/ui/StatsUI.tscn" id="10_stats"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -26,6 +27,8 @@ process_mode = 3
 [node name="LevelSelectUI" parent="UI" instance=ExtResource("8_ls")]
 
 [node name="SettingsUI" parent="UI" instance=ExtResource("9_set")]
+
+[node name="StatsUI" parent="UI" instance=ExtResource("10_stats")]
 
 [node name="PauseUI" parent="UI" instance=ExtResource("4_pause")]
 

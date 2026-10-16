@@ -1,12 +1,20 @@
 class_name WormChain
 extends Node2D
-## Professional Zuma-style chain.
+## Zuma-style worm chain built on a segment model.
 ##
-## Index 0 = leader (closest to path END). Last = rear (path START).
-## Each worm has a logical [member Worm.target_path_distance] and a smoothed
-## [member Worm.path_distance]. Inserts open a gap by shifting front targets;
-## matches remove cleanly; the rear then magnetically surges forward; cascades
-## re-check until stable.
+## Index 0 = leader (closest to the path END). Last = rear (path START).
+## [member Worm.target_path_distance] is the authoritative logical position;
+## [member Worm.path_distance] is the displayed position that eases toward it.
+##
+## Rules (all deterministic, driven by [method step]):
+## - Worms whose logical spacing is exactly [member worm_spacing] form a segment.
+## - Only the REAR segment (fed by the spawner) is pushed forward by the march.
+## - A front segment cut off by a match stops. If the two worms facing each
+##   other across the gap share a color, the front segment rolls BACKWARD
+##   (accelerating) until it hits the segment behind it.
+## - Contacts are resolved by pushing worms forward; a join re-checks matches
+##   at the joint, producing cascades.
+## - Matches are only evaluated around an inserted worm or at a join point.
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -14,35 +22,40 @@ extends Node2D
 
 const MIN_MATCH_SIZE: int = 3
 
-## Display → target easing while marching / settling.
-const FOLLOW_RATE: float = 18.0
+## Display → logical easing for slides caused by inserts and pushes.
+const FOLLOW_RATE: float = 20.0
 
-## Faster follow during magnetic collapse (rear surge).
-const COLLAPSE_FOLLOW_RATE: float = 28.0
+## Two worms closer than spacing + this are treated as touching.
+const JOIN_EPSILON: float = 0.5
 
-## Gap considered closed when adjacent error is below this (pixels).
-const GAP_CLOSED_EPSILON: float = 1.25
+## Delay between an insert landing and its match check (lets the slide read).
+const INSERT_SETTLE_TIME: float = 0.09
 
-## How long matched worms flash before leaving the chain visually.
-const MATCH_FLASH_TIME: float = 0.12
+## Reverse motion of a front segment pulled back toward a matching color (px/s).
+const REVERSE_START_SPEED: float = 140.0
+const REVERSE_ACCEL: float = 1100.0
+const REVERSE_MAX_SPEED: float = 620.0
 
-## Brief pause after gap opens before match check (lets insert read).
-const INSERT_SETTLE_TIME: float = 0.11
-
-## Speed bonus applied to rear segment during magnetic pull (px/s).
-const MAGNETIC_SURGE_SPEED: float = 420.0
+## Distance travelled at intro speed when a level starts (Zuma roll-in).
+const INTRO_SPEED_MULTIPLIER: float = 7.0
 
 const SPAWN_DISTANCE: float = 0.0
 
 # ---------------------------------------------------------------------------
-# Phase
+# Phase (derived, read-only for other systems)
 # ---------------------------------------------------------------------------
 
 enum Phase {
+	## Rear segment marching, nothing pending.
 	MARCHING,
-	INSERT_OPENING,
-	MATCH_FLASH,
-	COLLAPSING,
+	## A shot landed and its match check is pending.
+	RESOLVING,
+	## At least one front segment is rolling backward to close a gap.
+	REVERSING,
+	## Scripted hold (boss) or game paused.
+	PAUSED,
+	LEVEL_COMPLETE,
+	LEVEL_FAILED,
 }
 
 # ---------------------------------------------------------------------------
@@ -75,27 +88,30 @@ var _curve: Curve2D
 var _path_length: float = 0.0
 var _spawn_timer: float = 0.0
 var _has_reached_end: bool = false
-
-var _phase: Phase = Phase.MARCHING
-var _phase_timer: float = 0.0
 var _pool: WormPool
 
-## True while a shot-triggered resolve sequence is running.
-var _resolving_shot: bool = false
-## Accumulates whether the current shot produced any match (incl. cascades).
-var _shot_scored_match: bool = false
-## Cascade depth for the active resolve (0 = first match group wave).
-var _cascade_depth: int = 0
+## LEVEL_COMPLETE / LEVEL_FAILED lock; otherwise -1.
+var _terminal_phase: int = -1
 
-## During collapse: index of first rear worm after the gap (-1 if none).
-var _collapse_rear_start: int = -1
+## Pending insert checks: [{"worm": Worm, "time": float}]
+var _pending_checks: Array[Dictionary] = []
 
-## If a shot lands mid-resolve, re-evaluate once the current sequence ends.
-var _pending_reevaluate: bool = false
-## Temporary chain slow from Slow special worms (seconds).
+## Reverse speed per gap, keyed by the instance id of the front segment's tail.
+var _reverse_speed: Dictionary = {}
+## Cascade depth carried by a gap (same key) — set when a match opens it.
+var _gap_depth: Dictionary = {}
+
+## Temporary chain slow from Slow special worms / ability (seconds).
 var _slow_timer: float = 0.0
-## Last danger urgency emitted (avoid spam).
 var _last_danger_emit: float = -1.0
+## External hold (boss intro / scripted stare).
+var _hold_march: bool = false
+## Remaining distance to roll in at intro speed.
+var _intro_remaining: float = 0.0
+
+## World position of the most recent match / reverse (for feedback placement).
+var last_match_position: Vector2 = Vector2.ZERO
+var last_reverse_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -103,39 +119,44 @@ func _ready() -> void:
 	_ensure_pool()
 	if path != null:
 		_rebuild_curve_cache()
-	_spawn_timer = spawn_interval * 0.5
+	_spawn_timer = spawn_interval
 
 
 func _process(delta: float) -> void:
-	# Finish shot resolve even while the pause menu is open (no new player shots).
-	if GameManager.is_paused and not _resolving_shot:
+	if GameManager.is_paused or not GameManager.is_playing():
 		return
-	if not GameManager.is_playing() and not _resolving_shot:
-		return
+	step(delta)
+
+
+## Advance the simulation by [param delta]. Called from [method _process];
+## tests call it directly for deterministic stepping.
+func step(delta: float) -> void:
 	if _curve == null:
 		if path != null:
 			_rebuild_curve_cache()
 		if _curve == null:
 			return
+	if _terminal_phase >= 0:
+		_sync_worm_transforms(delta)
+		return
 
 	if _slow_timer > 0.0:
 		_slow_timer = maxf(_slow_timer - delta, 0.0)
 
-	match _phase:
-		Phase.MARCHING:
-			if not GameManager.is_paused:
-				_process_marching(delta)
-		Phase.INSERT_OPENING:
-			_process_insert_opening(delta)
-		Phase.MATCH_FLASH:
-			_process_match_flash(delta)
-		Phase.COLLAPSING:
-			_process_collapsing(delta)
+	var gaps_before: Array[int] = _gap_tail_ids()
 
-	_sync_worm_transforms()
-	if not GameManager.is_paused:
+	if not _hold_march and is_marching:
+		if auto_spawn and not _has_reached_end:
+			_process_auto_spawn(delta)
+		_advance_rear_segment(delta)
+	_process_reverse(delta)
+	_resolve_contacts(gaps_before)
+	_process_pending_checks(delta)
+
+	_sync_worm_transforms(delta)
+	if not is_busy():
 		_check_end_condition()
-		_emit_danger_warning()
+	_emit_danger_warning()
 
 
 # ---------------------------------------------------------------------------
@@ -162,25 +183,183 @@ func get_rear() -> Worm:
 	return _worms[_worms.size() - 1] if not _worms.is_empty() else null
 
 
+## True while a match check or gap reversal is in progress.
 func is_busy() -> bool:
-	return _phase != Phase.MARCHING or _resolving_shot
+	return not _pending_checks.is_empty() or is_reversing()
+
+
+## True while any gap has matching edge colors — the front segment is (or is
+## about to be, this very step) rolling backward.
+func is_reversing() -> bool:
+	for i: int in range(_worms.size() - 1):
+		if not _is_connected(i) and _colors_link(_worms[i], _worms[i + 1]):
+			return true
+	return false
+
+
+func get_phase() -> Phase:
+	if _terminal_phase >= 0:
+		return _terminal_phase as Phase
+	if is_reversing():
+		return Phase.REVERSING
+	if not _pending_checks.is_empty():
+		return Phase.RESOLVING
+	if _hold_march or GameManager.is_paused:
+		return Phase.PAUSED
+	return Phase.MARCHING
+
+
+## Number of separate segments (1 = one solid train).
+func get_segment_count() -> int:
+	return _segments().size()
+
+
+## Colors currently on the visible chain — the shooter only deals these.
+func get_present_colors() -> Array[int]:
+	var colors: Array[int] = []
+	for worm: Worm in _worms:
+		if worm.target_path_distance < 0.0:
+			continue
+		var c: int = int(worm.worm_color)
+		if not colors.has(c):
+			colors.append(c)
+	return colors
+
+
+## Player / ability slow — stacks with Slow special worms.
+func apply_slow(duration: float) -> void:
+	_slow_timer = maxf(_slow_timer, maxf(duration, 0.0))
+
+
+func get_slow_remaining() -> float:
+	return _slow_timer
+
+
+## Leader progress along the path in [0, 1].
+func get_leader_progress() -> float:
+	if _worms.is_empty() or _path_length <= 1.0:
+		return 0.0
+	return clampf(_worms[0].target_path_distance / _path_length, 0.0, 1.0)
+
+
+## A visible worm is on the path (not still queued in the start tunnel).
+func is_worm_targetable(worm: Worm) -> bool:
+	return (
+		is_instance_valid(worm)
+		and worm.is_active_in_chain()
+		and worm.target_path_distance >= 0.0
+		and worm.path_distance >= 0.0
+	)
+
+
+# ---------------------------------------------------------------------------
+# Public API — control
+# ---------------------------------------------------------------------------
+
+## Start the fast Zuma roll-in for the first [param distance] pixels.
+func begin_intro_roll(distance: float) -> void:
+	_intro_remaining = maxf(distance, 0.0)
+
+
+## Bomb ability: clear the worm nearest [param global_pos] and its neighbors.
+func detonate_at_nearest(global_pos: Vector2) -> int:
+	if _worms.is_empty() or _terminal_phase >= 0:
+		return 0
+	var idx: int = find_nearest_worm_index(global_pos)
+	if idx < 0:
+		return 0
+	var indices: Array[int] = []
+	for i: int in [idx - 1, idx, idx + 1]:
+		if i >= 0 and i < _worms.size():
+			indices.append(i)
+	var color: WormColor.Kind = _worms[idx].worm_color
+	_remove_group(indices, color, 0, &"bomb")
+	return indices.size()
+
+
+## Inject a burst of rear worms (boss pattern support).
+func inject_rear_burst(count: int, prefer_special: bool = false) -> void:
+	for i: int in range(maxi(count, 0)):
+		var rolled: Dictionary = GameManager.roll_worm()
+		var type: WormType.Kind = rolled["type"] as WormType.Kind
+		if prefer_special and type == WormType.Kind.NORMAL:
+			type = WormType.Kind.BOMB if (i % 2 == 0) else WormType.Kind.SLOW
+		spawn_rear(rolled["color"] as WormColor.Kind, type)
+		if spawns_remaining > 0:
+			spawns_remaining -= 1
+
+
+## Boss attack: repaint up to [param count] visible worms. Returns the repainted
+## worms. Matches are not triggered by repainting (only by inserts / joins).
+func recolor_random(count: int, color: WormColor.Kind) -> Array[Worm]:
+	var candidates: Array[Worm] = []
+	for worm: Worm in _worms:
+		if is_worm_targetable(worm) and worm.worm_color != color and worm.worm_type == WormType.Kind.NORMAL:
+			candidates.append(worm)
+	var rng: RandomNumberGenerator = GameManager.get_rng()
+	var changed: Array[Worm] = []
+	while changed.size() < count and not candidates.is_empty():
+		var worm: Worm = candidates.pop_at(rng.randi_range(0, candidates.size() - 1))
+		worm.worm_color = color
+		changed.append(worm)
+	return changed
+
+
+## Victory: pop every worm (no scoring) and lock the chain.
+func pop_all(reason: StringName = &"victory") -> void:
+	var removed: Array[Worm] = _worms.duplicate()
+	_worms.clear()
+	_pending_checks.clear()
+	_reverse_speed.clear()
+	_gap_depth.clear()
+	for worm: Worm in removed:
+		worm.begin_match()
+		EventBus.worm_removed.emit(worm, reason)
+	_kickoff_falls(removed)
+	spawns_remaining = 0
+	mark_level_complete()
+
+
+## Scripted hold (boss intro / stare). Gap reversal and match checks continue.
+func set_hold_march(hold: bool) -> void:
+	_hold_march = hold
+
+
+func is_holding() -> bool:
+	return _hold_march
+
+
+func mark_level_complete() -> void:
+	is_marching = false
+	auto_spawn = false
+	_terminal_phase = Phase.LEVEL_COMPLETE
+	_pending_checks.clear()
+	_reverse_speed.clear()
+
+
+func mark_level_failed() -> void:
+	is_marching = false
+	auto_spawn = false
+	_terminal_phase = Phase.LEVEL_FAILED
+	_pending_checks.clear()
+	_reverse_speed.clear()
 
 
 # ---------------------------------------------------------------------------
 # Public API — mutation
 # ---------------------------------------------------------------------------
 
+## Append a worm behind the rear. Worms with negative distance wait hidden in
+## the start tunnel and roll in as the train advances.
 func spawn_rear(
 	color: WormColor.Kind = WormColor.Kind.RED,
 	type: WormType.Kind = WormType.Kind.NORMAL
 ) -> Worm:
 	if stop_spawn_at_cap and _worms.size() >= max_worms:
 		return null
-
 	var distance: float = SPAWN_DISTANCE
 	if not _worms.is_empty():
 		distance = minf(get_rear().target_path_distance - worm_spacing, SPAWN_DISTANCE)
-
 	var worm: Worm = _create_worm(color, distance, true, type)
 	if worm == null:
 		return null
@@ -198,120 +377,62 @@ func configure_spawn_budget(remaining_after_initial: int) -> void:
 		auto_spawn = false
 
 
-## Level is won only when the chain is empty and no more worms will spawn.
-func _try_emit_cleared() -> void:
-	if not _worms.is_empty():
-		return
-	# Infinite sandbox (spawns_remaining < 0) still clears when empty.
-	if spawns_remaining > 0:
-		return
-	EventBus.chain_cleared.emit(self)
-
-
-## Structural insert with smooth gap-open (no full-chain snap).
-func insert_worm(
-	index: int,
+## Insert a worm next to [param hit_index]. [param before] = on the leader side.
+## The new worm joins the hit worm's segment; contacts push worms forward.
+func insert_at(
+	hit_index: int,
+	before: bool,
 	color: WormColor.Kind,
-	animate_open: bool = true,
-	type: WormType.Kind = WormType.Kind.NORMAL
+	type: WormType.Kind = WormType.Kind.NORMAL,
+	queue_check: bool = true
 ) -> Worm:
-	index = clampi(index, 0, _worms.size())
-
-	var new_distance: float = SPAWN_DISTANCE
-	if _worms.is_empty():
-		new_distance = SPAWN_DISTANCE
-	elif index == 0:
-		new_distance = _worms[0].target_path_distance + worm_spacing
-	elif index >= _worms.size():
-		new_distance = _worms[_worms.size() - 1].target_path_distance - worm_spacing
-	else:
-		# Open a one-slot gap: shift the front group (+end direction) by spacing.
-		for i: int in range(index):
-			var w: Worm = _worms[i]
-			w.set_slot_distance(w.target_path_distance + worm_spacing, not animate_open)
-			w.state = Worm.State.SETTLING
-		# Seat the new worm in the opened slot (just ahead of the unmoved rear).
-		new_distance = _worms[index].target_path_distance + worm_spacing
-
-	var worm: Worm = _create_worm(color, new_distance, not animate_open, type)
-	if worm == null:
+	if _terminal_phase >= 0:
 		return null
-	worm.state = Worm.State.SETTLING
-	_worms.insert(index, worm)
+	var worm: Worm
+	if _worms.is_empty():
+		worm = _create_worm(color, SPAWN_DISTANCE, true, type)
+		if worm == null:
+			return null
+		_worms.append(worm)
+	else:
+		hit_index = clampi(hit_index, 0, _worms.size() - 1)
+		var hit: Worm = _worms[hit_index]
+		var gaps_before: Array[int] = _gap_tail_ids()
+		if not before and hit_index + 1 < _worms.size() and not _is_connected(hit_index):
+			# The new worm becomes the gap-facing tail; the old gap state is stale.
+			var old_key: int = hit.get_instance_id()
+			gaps_before.erase(old_key)
+			_reverse_speed.erase(old_key)
+			_gap_depth.erase(old_key)
+		var array_index: int = hit_index if before else hit_index + 1
+		var distance: float = hit.target_path_distance + (worm_spacing if before else -worm_spacing)
+		worm = _create_worm(color, distance, false, type)
+		if worm == null:
+			return null
+		# Start the slide from the hit worm so the insert visibly squeezes in.
+		worm.path_distance = hit.path_distance
+		worm.state = Worm.State.SETTLING
+		_worms.insert(array_index, worm)
+		_reindex()
+		_resolve_contacts(gaps_before)
 	_reindex()
-	_rebuild_targets_from_leader()
-
-	# After rebuild, keep display positions for a smooth open unless snapped.
-	if animate_open:
-		# Front worms already had display behind new targets; rear untouched.
-		# Ensure the new worm starts near its neighbors visually.
-		if index + 1 < _worms.size():
-			worm.path_distance = _worms[index + 1].path_distance + worm_spacing * 0.5
-		elif index > 0:
-			worm.path_distance = _worms[index - 1].path_distance - worm_spacing * 0.5
-
 	EventBus.worm_spawned.emit(worm)
-	EventBus.chain_worms_inserted.emit(self, index, 1)
+	EventBus.chain_worms_inserted.emit(self, worm.chain_index, 1)
+	if queue_check:
+		_pending_checks.append({"worm": worm, "time": INSERT_SETTLE_TIME})
 	return worm
 
 
-func remove_worms(index: int, count: int, reason: StringName = &"match") -> void:
-	if count <= 0 or _worms.is_empty():
-		return
-	index = clampi(index, 0, _worms.size() - 1)
-	count = mini(count, _worms.size() - index)
-
-	var removed: Array[Worm] = []
-	for i: int in range(count):
-		removed.append(_worms[index + i])
-
-	for worm: Worm in removed:
-		_worms.erase(worm)
-		worm.begin_match()
-		EventBus.worm_removed.emit(worm, reason)
-
-	_reindex()
-	EventBus.chain_worms_removed.emit(self, index, count)
-
-	# Stagger fall kickoffs without creating one timer coroutine per worm.
-	_kickoff_falls(removed)
-
-	if _worms.is_empty():
-		_try_emit_cleared()
-
-
-## Insert from a projectile hit, then run the full match/cascade sequence.
+## Insert from a projectile hit, then queue its match check.
 func insert_from_projectile(global_pos: Vector2, color: WormColor.Kind, hit_worm: Worm = null) -> Worm:
 	var hit: Worm = hit_worm
 	if hit == null or not is_instance_valid(hit) or not _worms.has(hit):
 		var nearest: int = find_nearest_worm_index(global_pos)
 		if nearest < 0:
-			var spawned: Worm = spawn_rear(color)
-			if _resolving_shot:
-				_pending_reevaluate = true
-			else:
-				_begin_shot_resolve(false)
-			return spawned
+			return null
 		hit = _worms[nearest]
-
-	var index: int = get_insert_index_for_hit(hit, global_pos)
-	var worm: Worm = insert_worm(index, color, true)
-	if _resolving_shot:
-		_pending_reevaluate = true
-	else:
-		_begin_shot_resolve(true)
-	return worm
-
-## Immediate match scan (debug / tools). Prefer shot resolve for gameplay.
-func resolve_matches() -> bool:
-	var groups: Array[Dictionary] = _find_all_matches()
-	if groups.is_empty():
-		return false
-	_resolving_shot = true
-	_shot_scored_match = false
-	_cascade_depth = 0
-	_apply_match_groups(groups, 0)
-	return true
+	var hit_index: int = _worms.find(hit)
+	return insert_at(hit_index, _is_impact_ahead(hit, global_pos), color)
 
 
 func clear_all(reason: StringName = &"reset") -> void:
@@ -322,12 +443,11 @@ func clear_all(reason: StringName = &"reset") -> void:
 		worm.kill()
 	_has_reached_end = false
 	_spawn_timer = 0.0
-	_phase = Phase.MARCHING
-	_resolving_shot = false
-	_shot_scored_match = false
-	_cascade_depth = 0
-	_collapse_rear_start = -1
-	_pending_reevaluate = false
+	_pending_checks.clear()
+	_reverse_speed.clear()
+	_gap_depth.clear()
+	_hold_march = false
+	_intro_remaining = 0.0
 
 
 func rebuild_path_cache() -> void:
@@ -339,7 +459,7 @@ func find_nearest_worm_index(global_pos: Vector2) -> int:
 	var best_dist_sq: float = INF
 	for i: int in range(_worms.size()):
 		var worm: Worm = _worms[i]
-		if not worm.is_active_in_chain():
+		if not is_worm_targetable(worm):
 			continue
 		var dist_sq: float = worm.global_position.distance_squared_to(global_pos)
 		if dist_sq < best_dist_sq:
@@ -348,247 +468,160 @@ func find_nearest_worm_index(global_pos: Vector2) -> int:
 	return best_index
 
 
+## Array index the projectile would occupy after hitting [param hit_worm].
 func get_insert_index_for_hit(hit_worm: Worm, hit_global_pos: Vector2) -> int:
-	var hit_index: int = hit_worm.chain_index
-	if hit_index < 0:
-		hit_index = _worms.find(hit_worm)
+	var hit_index: int = _worms.find(hit_worm)
 	if hit_index < 0:
 		return 0
-
-	var insert_before: bool = true
-	if _curve != null:
-		var sample: Transform2D = _sample_path(clampf(hit_worm.target_path_distance, 0.0, _path_length))
-		var tangent: Vector2 = path.global_transform.basis_xform(sample.x).normalized()
-		var to_impact: Vector2 = hit_global_pos - hit_worm.global_position
-		insert_before = to_impact.dot(tangent) >= 0.0
-	elif hit_index + 1 < _worms.size():
-		var behind: Worm = _worms[hit_index + 1]
-		insert_before = (
-			hit_worm.global_position.distance_squared_to(hit_global_pos)
-			<= behind.global_position.distance_squared_to(hit_global_pos)
-		)
-
-	return hit_index if insert_before else hit_index + 1
+	return hit_index if _is_impact_ahead(hit_worm, hit_global_pos) else hit_index + 1
 
 
 # ---------------------------------------------------------------------------
-# Shot resolve state machine
+# Segments
 # ---------------------------------------------------------------------------
 
-func _begin_shot_resolve(wait_for_insert: bool) -> void:
-	_resolving_shot = true
-	_shot_scored_match = false
-	_cascade_depth = 0
-	if wait_for_insert:
-		_phase = Phase.INSERT_OPENING
-		_phase_timer = INSERT_SETTLE_TIME
-	else:
-		_evaluate_matches_or_finish()
+func _is_connected(front_index: int) -> bool:
+	## True when worm [param front_index] touches the worm behind it.
+	if front_index < 0 or front_index + 1 >= _worms.size():
+		return false
+	var gap: float = _worms[front_index].target_path_distance - _worms[front_index + 1].target_path_distance
+	return gap <= worm_spacing + JOIN_EPSILON
 
 
-func _process_insert_opening(delta: float) -> void:
-	# Front still marches slowly so the train doesn't feel frozen.
-	if is_marching:
-		_advance_targets(delta * 0.35)
-	_follow_targets(delta, FOLLOW_RATE)
-	_phase_timer -= delta
-	if _phase_timer > 0.0:
-		return
-	# Snap any remaining micro-error at the insert site, then evaluate.
-	_rebuild_targets_from_leader()
-	_evaluate_matches_or_finish()
-
-
-func _evaluate_matches_or_finish() -> void:
-	var groups: Array[Dictionary] = _find_all_matches()
-	if groups.is_empty():
-		_finish_shot_resolve()
-		return
-	_apply_match_groups(groups, _cascade_depth)
-
-
-func _apply_match_groups(groups: Array[Dictionary], cascade_depth: int) -> void:
-	_shot_scored_match = true
-	_cascade_depth = cascade_depth
-
-	# Mark every matched index in one pass (supports multiple groups per wave).
-	var matched: Array[bool] = []
-	matched.resize(_worms.size())
-	for i: int in range(matched.size()):
-		matched[i] = false
-	var gap_index: int = _worms.size()
-	var total_removed: int = 0
-	var has_bonus: bool = false
-
-	for group: Dictionary in groups:
-		var start: int = int(group["start"])
-		var count: int = int(group["count"])
-		var color: WormColor.Kind = group["color"] as WormColor.Kind
-		EventBus.chain_match_found.emit(self, start, count, color)
-		EventBus.cascade_step.emit(self, cascade_depth, count, color)
-		gap_index = mini(gap_index, start)
-		for i: int in range(start, start + count):
-			if i >= 0 and i < matched.size():
-				matched[i] = true
-				if _worms[i].worm_type == WormType.Kind.BONUS:
-					has_bonus = true
-				if _worms[i].worm_type == WormType.Kind.SLOW:
-					_slow_timer = maxf(_slow_timer, 2.4)
-				if _worms[i].worm_type == WormType.Kind.BOMB:
-					# Clear one neighbor on each side of the bomb.
-					for n: int in [i - 1, i + 1]:
-						if n >= 0 and n < matched.size():
-							matched[n] = true
-		# Strong opening match → explicit good-shot juice.
-		if cascade_depth == 0 and count >= 4:
-			var mid: int = clampi(start + count / 2, 0, _worms.size() - 1)
-			var shot_pos: Vector2 = _worms[mid].global_position if mid >= 0 else global_position
-			EventBus.good_shot.emit(shot_pos, count)
-
-	# Recount after bomb expansion.
-	total_removed = 0
-	for i: int in range(matched.size()):
-		if matched[i]:
-			total_removed += 1
-	GameManager.register_match(total_removed, groups[0]["color"] as WormColor.Kind, cascade_depth, has_bonus)
-
-	var kept: Array[Worm] = []
-	var removed: Array[Worm] = []
-	for i: int in range(_worms.size()):
-		var worm: Worm = _worms[i]
-		if matched[i]:
-			removed.append(worm)
-			worm.begin_match()
-			EventBus.worm_removed.emit(worm, &"match")
-		else:
-			kept.append(worm)
-
-	_worms = kept
-	_reindex()
-	EventBus.chain_worms_removed.emit(self, gap_index, total_removed)
-	_kickoff_falls(removed)
-
+## Segments as [start, end] inclusive index pairs, front to rear.
+func _segments() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
 	if _worms.is_empty():
-		_try_emit_cleared()
-		_finish_shot_resolve()
-		return
-
-	# Rear segment starts at the forward-most hole (worms behind have shifted left).
-	_collapse_rear_start = gap_index
-	if _collapse_rear_start >= _worms.size():
-		_collapse_rear_start = -1
-
-	_phase = Phase.MATCH_FLASH
-	_phase_timer = MATCH_FLASH_TIME
-	EventBus.chain_collapse_started.emit(self, total_removed)
+		return result
+	var start: int = 0
+	for i: int in range(_worms.size() - 1):
+		if not _is_connected(i):
+			result.append(Vector2i(start, i))
+			start = i + 1
+	result.append(Vector2i(start, _worms.size() - 1))
+	return result
 
 
-func _process_match_flash(delta: float) -> void:
-	# Hold front gently; don't close gaps yet so the pop reads.
-	if is_marching:
-		_advance_targets(delta * 0.2)
-	_follow_targets(delta, FOLLOW_RATE * 0.5)
-	_phase_timer -= delta
-	if _phase_timer > 0.0:
-		return
-
-	_rebuild_targets_from_leader()
-	_phase = Phase.COLLAPSING
-	# Mark rear worms as retracting for subtle state feedback.
-	if _collapse_rear_start >= 0:
-		for i: int in range(_collapse_rear_start, _worms.size()):
-			if _worms[i].is_active_in_chain():
-				_worms[i].state = Worm.State.RETRACTING
+## Instance ids of every front-segment tail currently facing a gap.
+func _gap_tail_ids() -> Array[int]:
+	var ids: Array[int] = []
+	for i: int in range(_worms.size() - 1):
+		if not _is_connected(i):
+			ids.append(_worms[i].get_instance_id())
+	return ids
 
 
-func _process_collapsing(delta: float) -> void:
-	# Front continues a soft march; rear surges toward rebuilt targets.
-	if is_marching:
-		_advance_targets(delta * 0.25)
-
-	# Magnetic surge: pull rear display distances toward targets quickly.
-	if _collapse_rear_start >= 0 and _collapse_rear_start < _worms.size():
-		for i: int in range(_collapse_rear_start, _worms.size()):
-			var worm: Worm = _worms[i]
-			var err: float = worm.target_path_distance - worm.path_distance
-			if err > 0.0:
-				worm.path_distance += minf(err, MAGNETIC_SURGE_SPEED * delta)
-
-	_follow_targets(delta, COLLAPSE_FOLLOW_RATE)
-
-	if _is_gap_closed():
-		# Join complete — clear retracting states.
-		for worm: Worm in _worms:
-			if worm.state == Worm.State.RETRACTING or worm.state == Worm.State.SETTLING:
-				worm.state = Worm.State.MOVING
-		_collapse_rear_start = -1
-		EventBus.chain_collapse_finished.emit(self)
-		# Cascade check.
-		_cascade_depth += 1
-		_evaluate_matches_or_finish()
-
-
-func _finish_shot_resolve() -> void:
-	_phase = Phase.MARCHING
-	_resolving_shot = false
-	_collapse_rear_start = -1
-	for worm: Worm in _worms:
-		if worm.state == Worm.State.SETTLING or worm.state == Worm.State.RETRACTING:
-			worm.state = Worm.State.MOVING
-	_rebuild_targets_from_leader()
-
-	var scored: bool = _shot_scored_match
-	GameManager.notify_shot_resolved(scored)
-	EventBus.shot_resolve_finished.emit(self, scored)
-	_shot_scored_match = false
-	_cascade_depth = 0
-
-	if _pending_reevaluate:
-		_pending_reevaluate = false
-		_begin_shot_resolve(false)
-
-
-func _is_gap_closed() -> bool:
-	if _worms.size() < 2:
+func _colors_link(a: Worm, b: Worm) -> bool:
+	if a.worm_type == WormType.Kind.RAINBOW or b.worm_type == WormType.Kind.RAINBOW:
 		return true
-	# Entire chain within epsilon of ideal spacing from leader.
-	var anchor: float = _worms[0].target_path_distance
-	for i: int in range(_worms.size()):
-		var ideal: float = anchor - float(i) * worm_spacing
-		if absf(_worms[i].path_distance - ideal) > GAP_CLOSED_EPSILON:
-			return false
-		if absf(_worms[i].target_path_distance - ideal) > GAP_CLOSED_EPSILON:
-			return false
-	return true
+	return a.worm_color == b.worm_color
 
 
 # ---------------------------------------------------------------------------
-# Marching
+# Movement
 # ---------------------------------------------------------------------------
 
-func _process_marching(delta: float) -> void:
-	if auto_spawn and not _has_reached_end and not _resolving_shot:
-		_process_auto_spawn(delta)
-	if is_marching and not _worms.is_empty():
-		_advance_targets(delta)
-	_follow_targets(delta, FOLLOW_RATE)
+func _advance_rear_segment(delta: float) -> void:
+	if _worms.is_empty():
+		return
+	var speed: float = march_speed * _march_tension_multiplier()
+	if _slow_timer > 0.0:
+		speed *= 0.45
+	if _intro_remaining > 0.0:
+		speed = maxf(speed, march_speed) * INTRO_SPEED_MULTIPLIER
+	var distance: float = speed * delta
+	if _intro_remaining > 0.0:
+		distance = minf(distance, _intro_remaining)
+		_intro_remaining -= distance
+	var segs: Array[Vector2i] = _segments()
+	var rear: Vector2i = segs[segs.size() - 1]
+	for i: int in range(rear.x, rear.y + 1):
+		_worms[i].target_path_distance += distance
+		_worms[i].path_distance += distance
 
 
-func _advance_targets(delta: float) -> void:
-	var tension: float = _march_tension_multiplier()
-	var slow_mul: float = 0.45 if _slow_timer > 0.0 else 1.0
-	var step: float = march_speed * tension * slow_mul * delta
-	for worm: Worm in _worms:
-		if worm.is_active_in_chain():
-			worm.target_path_distance += step
+func _process_reverse(delta: float) -> void:
+	## Front segments whose gap edges match roll backward; others stand still.
+	var segs: Array[Vector2i] = _segments()
+	var live_keys: Dictionary = {}
+	for s: int in range(segs.size() - 1):
+		var seg: Vector2i = segs[s]
+		var tail: Worm = _worms[seg.y]
+		var behind: Worm = _worms[seg.y + 1]
+		var key: int = tail.get_instance_id()
+		live_keys[key] = true
+		if not _colors_link(tail, behind):
+			_reverse_speed[key] = 0.0
+			continue
+		var speed: float = float(_reverse_speed.get(key, 0.0))
+		if speed <= 0.0:
+			speed = REVERSE_START_SPEED
+			last_reverse_position = tail.global_position
+			EventBus.chain_reversing.emit(self)
+		else:
+			speed = minf(speed + REVERSE_ACCEL * delta, REVERSE_MAX_SPEED)
+		_reverse_speed[key] = speed
+		# Never back past the worm behind: contact resolution snaps the join.
+		var room: float = tail.target_path_distance - behind.target_path_distance - worm_spacing
+		var move: float = minf(speed * delta, maxf(room, 0.0))
+		for i: int in range(seg.x, seg.y + 1):
+			_worms[i].target_path_distance -= move
+			_worms[i].path_distance -= move
+	# Forget gaps that no longer exist.
+	for key: Variant in _reverse_speed.keys():
+		if not live_keys.has(key):
+			_reverse_speed.erase(key)
+	for key: Variant in _gap_depth.keys():
+		if not live_keys.has(key):
+			_gap_depth.erase(key)
+
+
+func _resolve_contacts(gaps_before: Array[int]) -> void:
+	## Push worms forward so no two overlap, then fire join checks for gaps
+	## that closed this step.
+	for i: int in range(_worms.size() - 2, -1, -1):
+		var required: float = _worms[i + 1].target_path_distance + worm_spacing
+		if _worms[i].target_path_distance < required:
+			_worms[i].target_path_distance = required
+	if gaps_before.is_empty():
+		return
+	var joins: Array[Dictionary] = []
+	for i: int in range(_worms.size() - 1):
+		var key: int = _worms[i].get_instance_id()
+		if gaps_before.has(key) and _is_connected(i):
+			# Snap the join to exact spacing so segments stay perfectly packed.
+			var exact: float = _worms[i + 1].target_path_distance + worm_spacing
+			var correction: float = exact - _worms[i].target_path_distance
+			if absf(correction) > 0.0001:
+				var j: int = i
+				while j >= 0:
+					_worms[j].target_path_distance += correction
+					if j == 0 or not _is_connected(j - 1):
+						break
+					j -= 1
+			var was_reversing: bool = float(_reverse_speed.get(key, 0.0)) > 0.0
+			joins.append({
+				"tail": _worms[i],
+				"depth": int(_gap_depth.get(key, 0)),
+				"reversing": was_reversing,
+			})
+			_reverse_speed.erase(key)
+			_gap_depth.erase(key)
+	for join: Dictionary in joins:
+		var tail: Worm = join["tail"] as Worm
+		if bool(join["reversing"]):
+			EventBus.chain_collapse_finished.emit(self)
+		var idx: int = _worms.find(tail)
+		if idx < 0 or idx + 1 >= _worms.size():
+			continue
+		_check_join(idx, int(join["depth"]))
 
 
 func _march_tension_multiplier() -> float:
 	## Speeds up as the leader nears the pit or the spawn budget runs low.
 	var mul: float = 1.0
 	if _path_length > 1.0 and not _worms.is_empty():
-		var leader: Worm = get_leader()
-		var progress: float = clampf(leader.path_distance / _path_length, 0.0, 1.0)
+		var progress: float = get_leader_progress()
 		if progress > 0.55:
 			mul += (progress - 0.55) * 0.85
 	if spawns_remaining >= 0 and spawns_remaining <= 8:
@@ -596,69 +629,168 @@ func _march_tension_multiplier() -> float:
 	return mul
 
 
-func _follow_targets(delta: float, rate: float) -> void:
-	var t: float = 1.0 - exp(-rate * delta)
-	for worm: Worm in _worms:
-		if not worm.is_active_in_chain():
-			continue
-		worm.path_distance = lerpf(worm.path_distance, worm.target_path_distance, t)
-		if absf(worm.path_distance - worm.target_path_distance) <= 0.2:
-			worm.path_distance = worm.target_path_distance
-			if worm.state == Worm.State.SETTLING and _phase == Phase.MARCHING:
-				worm.state = Worm.State.MOVING
+# ---------------------------------------------------------------------------
+# Matching
+# ---------------------------------------------------------------------------
 
-
-func _rebuild_targets_from_leader() -> void:
-	if _worms.is_empty():
+func _process_pending_checks(delta: float) -> void:
+	if _pending_checks.is_empty():
 		return
-	var anchor: float = _worms[0].target_path_distance
-	# Prefer displayed leader if it's ahead (keeps collapse from yanking forward).
-	anchor = maxf(anchor, _worms[0].path_distance)
-	_worms[0].set_slot_distance(anchor, false)
-	for i: int in range(1, _worms.size()):
-		_worms[i].set_slot_distance(anchor - float(i) * worm_spacing, false)
+	var due: Array[Dictionary] = []
+	var still: Array[Dictionary] = []
+	for entry: Dictionary in _pending_checks:
+		entry["time"] = float(entry["time"]) - delta
+		if float(entry["time"]) <= 0.0:
+			due.append(entry)
+		else:
+			still.append(entry)
+	_pending_checks = still
+	for entry: Dictionary in due:
+		var worm: Worm = entry["worm"] as Worm
+		var idx: int = _worms.find(worm) if is_instance_valid(worm) else -1
+		var scored: bool = idx < 0  # Already popped by another match.
+		if idx >= 0:
+			var run: Array[int] = _find_run(idx)
+			if run.size() >= MIN_MATCH_SIZE:
+				_remove_group(run, _run_color(run), 0, &"match")
+				scored = true
+		GameManager.notify_shot_resolved(scored)
+		EventBus.shot_resolve_finished.emit(self, scored)
 
 
-# ---------------------------------------------------------------------------
-# Match finding — all groups in one pass
-# ---------------------------------------------------------------------------
+func _check_join(front_index: int, depth: int) -> void:
+	## A gap just closed between [param front_index] and the worm behind it.
+	var run: Array[int] = _find_run(front_index)
+	if run.size() < MIN_MATCH_SIZE or not run.has(front_index + 1):
+		return
+	_remove_group(run, _run_color(run), depth, &"match")
 
-func _find_all_matches() -> Array[Dictionary]:
-	## Rainbow worms act as wildcards inside a contiguous run.
-	var results: Array[Dictionary] = []
-	if _worms.size() < MIN_MATCH_SIZE:
-		return results
 
-	var run_start: int = 0
-	var run_color: int = -1 ## -1 = only rainbows so far
-	var run_count: int = 1
-	if _worms[0].worm_type != WormType.Kind.RAINBOW:
-		run_color = int(_worms[0].worm_color)
+## Contiguous same-color run (within one segment) containing [param index].
+## Rainbow worms act as wildcards.
+func _find_run(index: int) -> Array[int]:
+	var best: Array[int] = []
+	var seed: Worm = _worms[index]
+	var candidates: Array[int] = []
+	if seed.worm_type == WormType.Kind.RAINBOW:
+		for n: int in [index - 1, index + 1]:
+			if n >= 0 and n < _worms.size() and _worms[n].worm_type != WormType.Kind.RAINBOW:
+				if (n < index and _is_connected(n)) or (n > index and _is_connected(index)):
+					candidates.append(int(_worms[n].worm_color))
+		if candidates.is_empty():
+			candidates.append(int(seed.worm_color))
+	else:
+		candidates.append(int(seed.worm_color))
+	for color: int in candidates:
+		var run: Array[int] = [index]
+		var i: int = index - 1
+		while i >= 0 and _is_connected(i) and _worm_matches(_worms[i], color):
+			run.push_front(i)
+			i -= 1
+		i = index + 1
+		while i < _worms.size() and _is_connected(i - 1) and _worm_matches(_worms[i], color):
+			run.append(i)
+			i += 1
+		if run.size() > best.size():
+			best = run
+	return best
 
-	for i: int in range(1, _worms.size()):
+
+func _worm_matches(worm: Worm, color: int) -> bool:
+	return worm.worm_type == WormType.Kind.RAINBOW or int(worm.worm_color) == color
+
+
+func _run_color(run: Array[int]) -> WormColor.Kind:
+	for i: int in run:
+		if _worms[i].worm_type != WormType.Kind.RAINBOW:
+			return _worms[i].worm_color
+	return _worms[run[0]].worm_color
+
+
+func _remove_group(indices: Array[int], color: WormColor.Kind, depth: int, reason: StringName) -> void:
+	if indices.is_empty():
+		return
+	var start: int = indices.min()
+	var count: int = indices.size()
+	var marked: Dictionary = {}
+	var has_bonus: bool = false
+	for i: int in indices:
+		marked[i] = true
+	# Specials inside the group: bombs take a neighbor on each side.
+	for i: int in indices:
 		var w: Worm = _worms[i]
-		var is_rainbow: bool = w.worm_type == WormType.Kind.RAINBOW
-		var matches: bool = false
-		if is_rainbow:
-			matches = true
-		elif run_color < 0:
-			matches = true
-			run_color = int(w.worm_color)
-		else:
-			matches = int(w.worm_color) == run_color
+		match w.worm_type:
+			WormType.Kind.BOMB:
+				for n: int in [i - 1, i + 1]:
+					if n >= 0 and n < _worms.size():
+						marked[n] = true
+			WormType.Kind.SLOW:
+				_slow_timer = maxf(_slow_timer, 2.4)
+			WormType.Kind.BONUS:
+				has_bonus = true
 
-		if matches:
-			run_count += 1
-		else:
-			if run_count >= MIN_MATCH_SIZE and run_color >= 0:
-				results.append({"start": run_start, "count": run_count, "color": run_color as WormColor.Kind})
-			run_start = i
-			run_count = 1
-			run_color = -1 if is_rainbow else int(w.worm_color)
+	var mid: Worm = _worms[clampi(start + count / 2, 0, _worms.size() - 1)]
+	last_match_position = mid.global_position
+	EventBus.chain_match_found.emit(self, start, count, color)
+	EventBus.cascade_step.emit(self, depth, count, color)
+	if depth == 0 and count >= 4 and reason == &"match":
+		EventBus.good_shot.emit(mid.global_position, count)
 
-	if run_count >= MIN_MATCH_SIZE and run_color >= 0:
-		results.append({"start": run_start, "count": run_count, "color": run_color as WormColor.Kind})
-	return results
+	var first: int = _worms.size()
+	for key: Variant in marked:
+		first = mini(first, int(key))
+	var kept: Array[Worm] = []
+	var removed: Array[Worm] = []
+	for i: int in range(_worms.size()):
+		if marked.has(i):
+			removed.append(_worms[i])
+		else:
+			kept.append(_worms[i])
+	GameManager.register_match(removed.size(), color, depth, has_bonus)
+
+	_worms = kept
+	_reindex()
+	for worm: Worm in removed:
+		_pending_drop(worm)
+		worm.begin_match()
+		EventBus.worm_removed.emit(worm, reason)
+	EventBus.chain_worms_removed.emit(self, first, removed.size())
+	EventBus.chain_collapse_started.emit(self, removed.size())
+	_kickoff_falls(removed)
+
+	# The new gap carries the next cascade depth.
+	if first > 0 and first < _worms.size():
+		_gap_depth[_worms[first - 1].get_instance_id()] = depth + 1
+
+	if _worms.is_empty():
+		_try_emit_cleared()
+
+
+func _pending_drop(worm: Worm) -> void:
+	for i: int in range(_pending_checks.size() - 1, -1, -1):
+		if _pending_checks[i]["worm"] == worm:
+			# The shot's worm popped as part of this group — resolved as a score.
+			_pending_checks.remove_at(i)
+			GameManager.notify_shot_resolved(true)
+			EventBus.shot_resolve_finished.emit(self, true)
+
+
+## Level is won only when the chain is empty and no more worms will spawn.
+func _try_emit_cleared() -> void:
+	if not _worms.is_empty():
+		return
+	if spawns_remaining > 0:
+		return
+	EventBus.chain_cleared.emit(self)
+
+
+func _is_impact_ahead(hit_worm: Worm, hit_global_pos: Vector2) -> bool:
+	## True when the projectile struck the leader-facing side of [param hit_worm].
+	if _curve == null or path == null:
+		return true
+	var sample: Transform2D = _sample_path(clampf(hit_worm.path_distance, 0.0, _path_length))
+	var tangent: Vector2 = path.global_transform.basis_xform(sample.x).normalized()
+	return (hit_global_pos - hit_worm.global_position).dot(tangent) >= 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -683,10 +815,9 @@ func _process_auto_spawn(delta: float) -> void:
 	_spawn_timer += delta
 	if _spawn_timer < spawn_interval:
 		return
-	if not _worms.is_empty():
-		var rear: Worm = get_rear()
-		if rear.target_path_distance < worm_spacing * 0.85:
-			return
+	# Only feed the tunnel once the rear has rolled onto the path.
+	if not _worms.is_empty() and get_rear().target_path_distance < 0.0:
+		return
 	_spawn_timer = 0.0
 	var rolled: Dictionary = GameManager.roll_worm()
 	var worm: Worm = spawn_rear(rolled["color"] as WormColor.Kind, rolled["type"] as WormType.Kind)
@@ -706,9 +837,8 @@ func _create_worm(
 	if worm == null:
 		worm = worm_scene.instantiate() as Worm
 		add_child(worm)
-	else:
-		if worm.get_parent() != self:
-			worm.reparent(self, false)
+	elif worm.get_parent() != self:
+		worm.reparent(self, false)
 	worm.pool = _pool
 	worm.setup(color, distance, type)
 	worm.set_slot_distance(distance, snap)
@@ -720,12 +850,12 @@ func _create_worm(
 func _emit_danger_warning() -> void:
 	if _worms.is_empty() or _path_length <= 1.0:
 		return
-	var leader: Worm = get_leader()
-	var remaining: float = _path_length - leader.path_distance
+	var remaining: float = _path_length - _worms[0].target_path_distance
 	var zone: float = 160.0
 	if remaining > zone:
 		if _last_danger_emit >= 0.0:
 			_last_danger_emit = -1.0
+			EventBus.danger_warning.emit(0.0)
 		return
 	var urgency: float = 1.0 - clampf(remaining / zone, 0.0, 1.0)
 	if absf(urgency - _last_danger_emit) < 0.08:
@@ -735,14 +865,14 @@ func _emit_danger_warning() -> void:
 
 
 func _kickoff_falls(removed: Array[Worm]) -> void:
-	# Single await serves the whole batch — no per-worm coroutine stutter.
+	# One pausable timer for the whole batch.
 	var tree := get_tree()
 	if tree == null:
 		for worm: Worm in removed:
 			if is_instance_valid(worm):
 				worm.begin_fall()
 		return
-	await tree.create_timer(MATCH_FLASH_TIME).timeout
+	await tree.create_timer(Worm.MATCH_POP_DURATION, false).timeout
 	for worm: Worm in removed:
 		if is_instance_valid(worm) and worm.state == Worm.State.MATCHED:
 			worm.begin_fall()
@@ -752,14 +882,23 @@ func _kickoff_falls(removed: Array[Worm]) -> void:
 # Transforms / path
 # ---------------------------------------------------------------------------
 
-func _sync_worm_transforms() -> void:
+func _sync_worm_transforms(delta: float) -> void:
+	var t: float = 1.0 - exp(-FOLLOW_RATE * delta)
 	for worm: Worm in _worms:
+		if absf(worm.path_distance - worm.target_path_distance) > 0.2:
+			worm.path_distance = lerpf(worm.path_distance, worm.target_path_distance, t)
+		else:
+			worm.path_distance = worm.target_path_distance
+			if worm.state == Worm.State.SETTLING:
+				worm.state = Worm.State.MOVING
 		_apply_transform_to_worm(worm)
 
 
 func _apply_transform_to_worm(worm: Worm) -> void:
 	if _curve == null:
 		return
+	# Worms still in the start tunnel stay hidden until they roll onto the path.
+	worm.visible = worm.path_distance >= 0.0
 	var dist: float = clampf(worm.path_distance, 0.0, _path_length)
 	var sample: Transform2D = _sample_path(dist)
 	var pos: Vector2 = path.to_global(sample.origin)
@@ -789,11 +928,7 @@ func _reindex() -> void:
 func _check_end_condition() -> void:
 	if _has_reached_end or _worms.is_empty():
 		return
-	# Only lose while marching — not mid-cascade.
-	if _phase != Phase.MARCHING:
-		return
-	var leader: Worm = get_leader()
-	if leader.path_distance >= _path_length:
+	if _worms[0].target_path_distance >= _path_length:
 		_has_reached_end = true
 		is_marching = false
 		auto_spawn = false

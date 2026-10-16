@@ -136,8 +136,17 @@ func _draw_grass(w: float, h: float) -> void:
 
 
 func _draw_vignette(w: float, h: float) -> void:
-	# Soft darken at edges — keeps eyes on brand + CTA.
-	draw_rect(Rect2(0, 0, w, h * 0.12), Color(0.02, 0.06, 0.03, 0.25))
-	draw_rect(Rect2(0, h * 0.78, w, h * 0.22), Color(0.02, 0.05, 0.02, 0.35))
-	draw_rect(Rect2(0, 0, w * 0.08, h), Color(0.02, 0.05, 0.02, 0.2))
-	draw_rect(Rect2(w * 0.92, 0, w * 0.08, h), Color(0.02, 0.05, 0.02, 0.2))
+	# Soft gradient darken at edges — keeps eyes on brand + CTA.
+	var dark := Color(0.02, 0.05, 0.02, 0.35)
+	var clear := Color(0.02, 0.05, 0.02, 0.0)
+	var top_h: float = h * 0.14
+	var bot_h: float = h * 0.24
+	var side_w: float = w * 0.1
+	draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, top_h), Vector2(0, top_h)]),
+		PackedColorArray([dark, dark, clear, clear]))
+	draw_polygon(PackedVector2Array([Vector2(0, h), Vector2(w, h), Vector2(w, h - bot_h), Vector2(0, h - bot_h)]),
+		PackedColorArray([dark, dark, clear, clear]))
+	draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(0, h), Vector2(side_w, h), Vector2(side_w, 0)]),
+		PackedColorArray([dark, dark, clear, clear]))
+	draw_polygon(PackedVector2Array([Vector2(w, 0), Vector2(w, h), Vector2(w - side_w, h), Vector2(w - side_w, 0)]),
+		PackedColorArray([dark, dark, clear, clear]))

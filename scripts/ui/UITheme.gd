@@ -141,12 +141,26 @@ static func button_ghost() -> StyleBoxFlat:
 	return s
 
 
+## Keyboard focus indicator drawn over a button's normal style (StyleBox "focus" is an overlay).
+static func focus_ring() -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.draw_center = false
+	s.border_color = YOLK_HOT
+	s.set_border_width_all(3)
+	s.set_corner_radius_all(14)
+	s.expand_margin_left = 3
+	s.expand_margin_right = 3
+	s.expand_margin_top = 3
+	s.expand_margin_bottom = 3
+	return s
+
+
 static func apply_primary_button(btn: Button) -> void:
 	apply_font(btn, WEIGHT_BOLD)
 	btn.add_theme_stylebox_override("normal", button_normal())
 	btn.add_theme_stylebox_override("hover", button_hover())
 	btn.add_theme_stylebox_override("pressed", button_pressed())
-	btn.add_theme_stylebox_override("focus", button_hover())
+	btn.add_theme_stylebox_override("focus", focus_ring())
 	btn.add_theme_color_override("font_color", MEADOW_DEEP)
 	btn.add_theme_color_override("font_hover_color", MEADOW_DEEP)
 	btn.add_theme_color_override("font_pressed_color", MEADOW_DEEP)
@@ -160,9 +174,10 @@ static func apply_ghost_button(btn: Button) -> void:
 	btn.add_theme_stylebox_override("normal", ghost)
 	btn.add_theme_stylebox_override("hover", ghost)
 	btn.add_theme_stylebox_override("pressed", button_pressed())
-	btn.add_theme_stylebox_override("focus", ghost)
+	btn.add_theme_stylebox_override("focus", focus_ring())
 	btn.add_theme_color_override("font_color", CREAM)
 	btn.add_theme_color_override("font_hover_color", YOLK_HOT)
+	btn.add_theme_color_override("font_focus_color", YOLK_HOT)
 	btn.add_theme_color_override("font_pressed_color", CREAM)
 	btn.add_theme_font_size_override("font_size", BUTTON_FONT - 2)
 	btn.custom_minimum_size = Vector2(0, TOUCH_MIN - 4)

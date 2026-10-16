@@ -4,10 +4,9 @@ extends Control
 signal closed
 
 const STAGE_SHORT: Array[String] = [
-	"Farmyard",
 	"Backyard",
-	"Apocalypse",
-	"Moonlit",
+	"Wild Garden",
+	"Forbidden Coop",
 ]
 
 @onready var _title: Label = $Safe/VBox/Header/Title
@@ -75,6 +74,12 @@ func _style_chrome() -> void:
 	_back.custom_minimum_size = Vector2(220, 52)
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if is_visible_in_tree() and event.is_action_pressed(&"ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_on_back()
+
+
 func _on_back() -> void:
 	UIFx.punch_button(_back)
 	visible = false
@@ -93,7 +98,6 @@ func _rebuild_stage_tabs() -> void:
 		btn.text = short
 		btn.tooltip_text = stage.display_name if stage else short
 		btn.custom_minimum_size = Vector2(150, 50)
-		btn.focus_mode = Control.FOCUS_NONE
 		if i == _stage_index:
 			_style_tab_active(btn)
 		else:
@@ -171,6 +175,20 @@ func _rebuild_grid() -> void:
 		var best: int = SaveService.get_level_best_score(level.id)
 		var card: Control = _make_level_card(level, unlocked, stars, best, i)
 		_grid.add_child(card)
+	_focus_furthest_card.call_deferred()
+
+
+func _focus_furthest_card() -> void:
+	if not is_visible_in_tree():
+		return
+	var target: Control = null
+	for c: Node in _grid.get_children():
+		if c is Control and not c.is_queued_for_deletion() and c.has_meta(&"level_card"):
+			target = c as Control
+	if target:
+		target.grab_focus()
+	else:
+		_back.grab_focus()
 
 
 func _make_level_card(
@@ -186,8 +204,12 @@ func _make_level_card(
 
 	var style := StyleBoxFlat.new()
 	if unlocked:
-		style.bg_color = Color(0.10, 0.22, 0.14, 0.96)
-		style.border_color = Color(0.95, 0.82, 0.28, 0.75) if stars > 0 else Color(1, 1, 1, 0.28)
+		if level.is_boss_level:
+			style.bg_color = Color(0.18, 0.10, 0.08, 0.96)
+			style.border_color = Color(1.0, 0.45, 0.2, 0.9)
+		else:
+			style.bg_color = Color(0.10, 0.22, 0.14, 0.96)
+			style.border_color = Color(0.95, 0.82, 0.28, 0.75) if stars > 0 else Color(1, 1, 1, 0.28)
 	else:
 		style.bg_color = Color(0.06, 0.1, 0.08, 0.9)
 		style.border_color = Color(1, 1, 1, 0.12)
@@ -208,7 +230,7 @@ func _make_level_card(
 	panel.add_child(vbox)
 
 	var num := Label.new()
-	num.text = "LEVEL %d" % level.level_number
+	num.text = "BOSS" if level.is_boss_level else ("LEVEL %d" % level.level_number)
 	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	num.add_theme_font_size_override("font_size", 13)
 	num.add_theme_color_override("font_color", Color(1, 1, 1, 0.55) if unlocked else Color(1, 1, 1, 0.3))
@@ -250,25 +272,35 @@ func _make_level_card(
 		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		var s_idx: int = _stage_index
 		var l_idx: int = level_index
+		panel.focus_mode = Control.FOCUS_ALL
+		panel.set_meta(&"level_card", true)
 		panel.gui_input.connect(func(event: InputEvent) -> void:
+			var activate: bool = false
 			if event is InputEventMouseButton:
 				var mb := event as InputEventMouseButton
-				if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-					UIFx.punch_button(panel)
-					# Don't emit closed — MainMenu stays hidden while the run loads.
-					visible = false
-					GameManager.start_run(s_idx, l_idx)
+				activate = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
+			elif event.is_action_pressed(&"ui_accept"):
+				activate = true
+			if activate:
+				panel.accept_event()
+				UIFx.punch_button(panel)
+				# Don't emit closed — MainMenu stays hidden while the run loads.
+				visible = false
+				GameManager.start_run(s_idx, l_idx)
 		)
-		# Hover brighten
-		panel.mouse_entered.connect(func() -> void:
-			var hs := style.duplicate() as StyleBoxFlat
-			hs.border_color = UITheme.YOLK_HOT
-			hs.bg_color = Color(0.14, 0.28, 0.18, 0.98)
-			panel.add_theme_stylebox_override("panel", hs)
-		)
-		panel.mouse_exited.connect(func() -> void:
-			panel.add_theme_stylebox_override("panel", style)
-		)
+		# Hover / keyboard focus brighten.
+		var hs := style.duplicate() as StyleBoxFlat
+		hs.border_color = UITheme.YOLK_HOT
+		hs.bg_color = Color(0.14, 0.28, 0.18, 0.98)
+		hs.set_border_width_all(3)
+		var highlight := func() -> void: panel.add_theme_stylebox_override("panel", hs)
+		var unhighlight := func() -> void:
+			if not panel.has_focus():
+				panel.add_theme_stylebox_override("panel", style)
+		panel.mouse_entered.connect(highlight)
+		panel.focus_entered.connect(highlight)
+		panel.mouse_exited.connect(unhighlight)
+		panel.focus_exited.connect(func() -> void: panel.add_theme_stylebox_override("panel", style))
 	else:
 		panel.modulate = Color(0.85, 0.85, 0.85, 0.9)
 

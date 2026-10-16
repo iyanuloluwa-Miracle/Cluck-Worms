@@ -232,6 +232,47 @@ static func path_s3_l12_apocalypse_spiral() -> PackedVector2Array:
 
 
 # ---------------------------------------------------------------------------
+# Boss arenas — the boss sits at (640, 262), the chicken at (640, 480).
+# Routes ring both and keep ~100px clear of the boss body. The top run stays
+# below BOSS_TOP_SAFE so the boss health strip never hides worms.
+# ---------------------------------------------------------------------------
+
+const BOSS_TOP_SAFE: float = 150.0
+
+static func path_boss_guardian_grove() -> PackedVector2Array:
+	## One generous lap that ends in a hollow beside the Guardian.
+	return PackedVector2Array([
+		Vector2(40, 160), Vector2(70, 400), Vector2(200, 630),
+		Vector2(640, 648), Vector2(1080, 630), Vector2(1220, 400),
+		Vector2(1190, 190), Vector2(960, 152), Vector2(640, 150),
+		Vector2(330, 158), Vector2(220, 270), Vector2(330, 350),
+		Vector2(420, 310),
+	])
+
+
+static func path_boss_queen_hive() -> PackedVector2Array:
+	## Hive lap with a second inner pass on the right before the pit.
+	return PackedVector2Array([
+		Vector2(1240, 648), Vector2(1250, 340), Vector2(1150, 165),
+		Vector2(880, 150), Vector2(640, 150), Vector2(390, 150),
+		Vector2(130, 165), Vector2(40, 340), Vector2(80, 560),
+		Vector2(300, 648), Vector2(640, 648), Vector2(980, 640),
+		Vector2(1110, 520), Vector2(1090, 340), Vector2(900, 310),
+	])
+
+
+static func path_boss_rooster_roost() -> PackedVector2Array:
+	## Long roost lap with a tight finishing curl above the chicken's left.
+	return PackedVector2Array([
+		Vector2(60, 648), Vector2(40, 380), Vector2(110, 165),
+		Vector2(400, 150), Vector2(880, 150), Vector2(1160, 165),
+		Vector2(1245, 380), Vector2(1160, 620), Vector2(860, 648),
+		Vector2(420, 648), Vector2(210, 590), Vector2(170, 420),
+		Vector2(250, 270), Vector2(390, 220),
+	])
+
+
+# ---------------------------------------------------------------------------
 # Stage 4 — Moonlit Garden (expert outer routes)
 # ---------------------------------------------------------------------------
 

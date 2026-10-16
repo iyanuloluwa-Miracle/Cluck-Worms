@@ -81,19 +81,18 @@ func _on_level_completed(_level_id: StringName, score: int, _lives: int) -> void
 	var stars: int = GameManager.last_level_stars
 	_show_stars_animated(stars)
 
-	# Score.
-	_score.text = "%s pts" % _format_score(score)
+	# Level score (run total underneath).
+	var level_score: int = GameManager.last_level_score
+	_score.text = "+%s pts   ·   Run %s" % [_format_score(level_score), _format_score(score)]
 
-	# Best comparison.
-	var prev_best: int = 0
-	if GameManager.current_level_def:
-		prev_best = SaveService.get_level_best_score(GameManager.current_level_def.id)
-	if prev_best > 0 and score > prev_best:
+	# Best comparison (previous best captured before this clear was saved).
+	var prev_best: int = GameManager.last_level_previous_best
+	if prev_best > 0 and level_score > prev_best:
 		_best.text = "New Best! (was %s)" % _format_score(prev_best)
 		_best.add_theme_color_override("font_color", UITheme.YOLK_HOT)
 		UIFx.pulse_label(_best)
 	elif prev_best > 0:
-		_best.text = "Personal Best  ·  %s" % _format_score(prev_best)
+		_best.text = "Best  ·  %s" % _format_score(prev_best)
 		_best.add_theme_color_override("font_color", Color(0.82, 0.88, 0.78, 0.75))
 	else:
 		_best.text = "First clear!"

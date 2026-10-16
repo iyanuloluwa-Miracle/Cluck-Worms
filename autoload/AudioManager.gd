@@ -2,14 +2,16 @@ extends Node
 ## Audio facade with procedural placeholder SFX (peck, pop, cascade, cluck…).
 ## Swap in real AudioStreams via register_stream() anytime — same logical names.
 
-@export var master_volume_db: float = 0.0
-@export var sfx_volume_db: float = -2.0
-@export var music_volume_db: float = -6.0
 @export var enable_procedural: bool = true
 
 const MAX_SFX_PLAYERS: int = 10
 const SAMPLE_RATE: int = 22050
 const MENU_MUSIC_PATH := "res://audio/music/menu_farmyard_loop.ogg"
+const MUSIC_BUS := &"Music"
+const SFX_BUS := &"SFX"
+## Headroom so music sits under gameplay SFX at equal slider values.
+const MUSIC_BASE_DB: float = -6.0
+const SFX_BASE_DB: float = -2.0
 
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _sfx_index: int = 0
@@ -17,29 +19,50 @@ var _music_player: AudioStreamPlayer
 var _streams: Dictionary = {}
 var _current_music: StringName = &""
 var _music_tween: Tween
+const STAGE_TRACKS: Array[StringName] = [&"stage_backyard", &"stage_garden", &"stage_coop", &"stage_boss"]
+var _compose_task: int = -1
+const FRAME_COMPOSE_BUDGET_MS: float = 3.0
+var _frame_queue: Array[StringName] = []
+var _frame_job: MusicComposer.Job
+## Number of stage tracks whose composed version has replaced the fallback drone.
+var composed_tracks: int = 0
 
 
 func _ready() -> void:
+	# Victory / defeat stingers fire while the tree is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ensure_bus(MUSIC_BUS)
+	_ensure_bus(SFX_BUS)
 	_music_player = AudioStreamPlayer.new()
 	_music_player.name = "MusicPlayer"
+	_music_player.bus = MUSIC_BUS
 	add_child(_music_player)
 
 	for i: int in MAX_SFX_PLAYERS:
 		var player := AudioStreamPlayer.new()
 		player.name = "SFXPlayer_%d" % i
+		player.bus = SFX_BUS
 		add_child(player)
 		_sfx_players.append(player)
 
 	if enable_procedural:
 		_build_procedural_bank()
+		_start_music_composition()
 	_register_music_bank()
-	_apply_volumes()
 
 	EventBus.chicken_shot.connect(_on_chicken_shot)
 	EventBus.chicken_swapped.connect(_on_chicken_swapped)
 	EventBus.projectile_hit_chain.connect(_on_projectile_hit)
 	EventBus.cascade_step.connect(_on_cascade_step)
 	EventBus.chain_collapse_started.connect(_on_collapse_started)
+	EventBus.chain_reversing.connect(_on_chain_reversing)
+	EventBus.boss_introduced.connect(_on_boss_introduced)
+	EventBus.boss_damaged.connect(_on_boss_damaged)
+	EventBus.boss_defeated.connect(_on_boss_defeated)
+	EventBus.boss_attack.connect(_on_boss_attack)
+	EventBus.ability_used.connect(_on_ability_used)
+	EventBus.achievement_unlocked.connect(_on_achievement)
+	EventBus.level_started.connect(_on_level_started_music)
 	EventBus.chain_reached_end.connect(_on_chain_reached_end)
 	EventBus.level_completed.connect(_on_level_completed)
 	EventBus.stage_completed.connect(_on_stage_completed)
@@ -63,14 +86,14 @@ func play_sfx(logical_name: StringName, pitch_scale: float = 1.0, volume_offset_
 	_sfx_index = (_sfx_index + 1) % MAX_SFX_PLAYERS
 	player.stream = _streams[logical_name]
 	player.pitch_scale = pitch_scale
-	player.volume_db = sfx_volume_db + master_volume_db + volume_offset_db
+	player.volume_db = volume_offset_db
 	player.play()
 
 
 func play_music(logical_name: StringName, fade_in: bool = false) -> void:
 	if not _streams.has(logical_name):
 		return
-	var target_db: float = music_volume_db + master_volume_db
+	var target_db: float = 0.0
 	if _current_music == logical_name and _music_player.playing:
 		_kill_music_tween()
 		_music_player.volume_db = target_db
@@ -103,16 +126,30 @@ func fade_out_music(duration: float = 0.45) -> void:
 	_music_tween.tween_callback(stop_music)
 
 
-func set_master_volume_db(value: float) -> void:
-	master_volume_db = value
-	_apply_volumes()
+## Apply linear 0..1 slider values to the Master / Music / SFX buses.
+func apply_mix(master: float, sfx: float, music: float, mute: bool) -> void:
+	_set_bus_linear(&"Master", master, 0.0, mute)
+	_set_bus_linear(MUSIC_BUS, music, MUSIC_BASE_DB, false)
+	_set_bus_linear(SFX_BUS, sfx, SFX_BASE_DB, false)
 
 
-func _apply_volumes() -> void:
-	if _music_tween == null or not _music_tween.is_running():
-		_music_player.volume_db = music_volume_db + master_volume_db
-	for player: AudioStreamPlayer in _sfx_players:
-		player.volume_db = sfx_volume_db + master_volume_db
+func _set_bus_linear(bus_name: StringName, linear: float, base_db: float, force_mute: bool) -> void:
+	var idx: int = AudioServer.get_bus_index(bus_name)
+	if idx < 0:
+		return
+	var silent: bool = force_mute or linear <= 0.001
+	AudioServer.set_bus_mute(idx, silent)
+	if not silent:
+		AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(linear, 0.001, 1.0)) + base_db)
+
+
+func _ensure_bus(bus_name: StringName) -> void:
+	if AudioServer.get_bus_index(bus_name) >= 0:
+		return
+	AudioServer.add_bus()
+	var idx: int = AudioServer.bus_count - 1
+	AudioServer.set_bus_name(idx, bus_name)
+	AudioServer.set_bus_send(idx, &"Master")
 
 
 func _kill_music_tween() -> void:
@@ -141,8 +178,37 @@ func _sync_music_to_state() -> void:
 func _on_game_state(_previous: int, next: int) -> void:
 	if next == GameManager.State.MAIN_MENU:
 		play_music(&"menu", true)
+	elif next == GameManager.State.PLAYING:
+		pass
 	elif _current_music == &"menu":
 		fade_out_music()
+
+
+func _on_level_started_music(_id: StringName, _name: String) -> void:
+	var track: StringName = &"stage_backyard"
+	if GameManager.current_level_def and GameManager.current_level_def.is_boss_level:
+		track = &"stage_boss"
+	else:
+		match GameManager.stage_index:
+			1:
+				track = &"stage_garden"
+			2:
+				track = &"stage_coop"
+			_:
+				track = &"stage_backyard"
+	play_music(track, true)
+
+
+func _on_boss_attack(_id: StringName, _attack: StringName) -> void:
+	play_sfx(&"boss_warn", 0.9)
+
+
+func _on_ability_used(_id: StringName) -> void:
+	play_sfx(&"ability")
+
+
+func _on_achievement(_id: StringName) -> void:
+	play_sfx(&"achievement", 1.05)
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +223,19 @@ func _build_procedural_bank() -> void:
 	_streams[&"cascade"] = _arpeggio([523.25, 659.25, 783.99], 0.055, 0.45)
 	_streams[&"impact"] = _noise_burst(0.05, 0.5, 400.0)
 	_streams[&"collapse"] = _tone_blip(220.0, 0.1, 0.35, true)
+	_streams[&"reverse"] = _tone_blip(180.0, 0.14, 0.4, true)
+	_streams[&"boss_intro"] = _arpeggio([196.0, 247.0, 294.0, 392.0], 0.09, 0.42)
+	_streams[&"boss_hit"] = _noise_burst(0.08, 0.55, 500.0)
+	_streams[&"boss_defeat"] = _arpeggio([392.0, 523.25, 659.25, 784.0], 0.08, 0.48)
+	_streams[&"boss_warn"] = _tone_blip(160.0, 0.16, 0.42, true)
+	_streams[&"ability"] = _arpeggio([440.0, 554.0, 659.0], 0.04, 0.4)
+	_streams[&"achievement"] = _arpeggio([523.25, 659.25, 783.99, 1046.5], 0.05, 0.4)
 	_streams[&"swap"] = _tone_blip(440.0, 0.05, 0.35, false)
+	# Looping procedural stage beds (replace with real ogg via register_stream).
+	_streams[&"stage_backyard"] = _loop_bed(196.0, 2.4, 0.10)
+	_streams[&"stage_garden"] = _loop_bed(220.0, 2.4, 0.10)
+	_streams[&"stage_coop"] = _loop_bed(164.8, 2.5, 0.11)
+	_streams[&"stage_boss"] = _loop_bed(130.8, 2.6, 0.12)
 	_streams[&"cluck"] = _tone_blip(320.0, 0.07, 0.4, true)
 	_streams[&"happy_cluck"] = _arpeggio([392.0, 523.25, 659.25], 0.05, 0.4)
 	_streams[&"sigh"] = _tone_blip(180.0, 0.12, 0.3, true)
@@ -235,6 +313,53 @@ func _wav_from_pcm(pcm16: PackedByteArray) -> AudioStreamWAV:
 	return stream
 
 
+func _start_music_composition() -> void:
+	# Rendering takes ~1-2s per track in GDScript, so it runs off the main thread;
+	# single-threaded web builds render a few milliseconds per frame instead.
+	if OS.has_feature("web") and not OS.has_feature("threads"):
+		_frame_queue = STAGE_TRACKS.duplicate()
+		return
+	_compose_task = WorkerThreadPool.add_task(_compose_all_tracks, false, "Compose stage music")
+
+
+func _process(_delta: float) -> void:
+	if _frame_queue.is_empty():
+		return
+	if _frame_job == null:
+		_frame_job = MusicComposer.Job.new(MusicComposer.spec_for(_frame_queue[0]), 8)
+	if _frame_job.step(FRAME_COMPOSE_BUDGET_MS):
+		_on_track_composed(_frame_queue.pop_front(), _frame_job.output)
+		_frame_job = null
+
+
+func _compose_all_tracks() -> void:
+	for track: StringName in STAGE_TRACKS:
+		var pcm: PackedByteArray = MusicComposer.render(MusicComposer.spec_for(track))
+		_on_track_composed.call_deferred(track, pcm)
+
+
+func _on_track_composed(track: StringName, pcm: PackedByteArray) -> void:
+	_streams[track] = MusicComposer.to_stream(pcm)
+	composed_tracks += 1
+	if _current_music == track and _music_player.playing:
+		_current_music = &""
+		play_music(track, true)
+
+
+func _exit_tree() -> void:
+	if _compose_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_compose_task)
+		_compose_task = -1
+
+
+func _loop_bed(freq: float, duration: float, amp: float) -> AudioStreamWAV:
+	var stream: AudioStreamWAV = _tone_blip(freq, duration, amp, false)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = int(duration * float(SAMPLE_RATE))
+	return stream
+
+
 # ---------------------------------------------------------------------------
 # Hooks
 # ---------------------------------------------------------------------------
@@ -264,6 +389,22 @@ func _on_cascade_step(_c: WormChain, depth: int, count: int, _color: WormColor.K
 
 func _on_collapse_started(_c: WormChain, _n: int) -> void:
 	play_sfx(&"collapse")
+
+
+func _on_chain_reversing(_c: WormChain) -> void:
+	play_sfx(&"reverse", 0.92)
+
+
+func _on_boss_introduced(_id: StringName, _name: String) -> void:
+	play_sfx(&"boss_intro")
+
+
+func _on_boss_damaged(_id: StringName, _amount: float, _pos: Vector2) -> void:
+	play_sfx(&"boss_hit", 1.0 + GameManager.get_rng().randf_range(-0.05, 0.08))
+
+
+func _on_boss_defeated(_id: StringName) -> void:
+	play_sfx(&"boss_defeat")
 
 
 func _on_chain_reached_end(_c: WormChain) -> void:

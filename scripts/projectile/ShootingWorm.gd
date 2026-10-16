@@ -177,8 +177,6 @@ func _test_chain_collision() -> void:
 		return
 
 	var worms: Array[Worm] = _chain.get_worms()
-	if worms.is_empty():
-		return
 
 	# Swept circle: segment from previous to current position vs each worm.
 	var from: Vector2 = _prev_global
@@ -188,9 +186,7 @@ func _test_chain_collision() -> void:
 	var best_t: float = INF
 
 	for worm: Worm in worms:
-		if not is_instance_valid(worm):
-			continue
-		if not worm.is_active_in_chain() and worm.state != Worm.State.SPAWNING:
+		if not _chain.is_worm_targetable(worm):
 			continue
 		var result: Dictionary = _segment_circle_hit(
 			from, to, worm.global_position, hit_radius + Worm.HEAD_RADIUS * 0.85
@@ -202,6 +198,15 @@ func _test_chain_collision() -> void:
 			best_t = t
 			hit_worm = worm
 			hit_point = result["point"]
+
+	# Bosses (and their eggs) block shots that reach them before the chain.
+	var boss_to: Vector2 = from.lerp(to, minf(best_t, 1.0))
+	for boss: Node in get_tree().get_nodes_in_group(&"boss_target"):
+		if boss is BossController and (boss as BossController).try_absorb_projectile(from, boss_to, worm_color) >= 0.0:
+			_did_hit = true
+			EventBus.projectile_hit_boss.emit(self)
+			_despawn()
+			return
 
 	if hit_worm == null:
 		return
@@ -248,7 +253,7 @@ func _scan_near_misses() -> void:
 	if _chain == null or not is_instance_valid(_chain) or _near_miss_emitted or _did_hit:
 		return
 	for worm: Worm in _chain.get_worms():
-		if not is_instance_valid(worm) or not worm.is_active_in_chain():
+		if not _chain.is_worm_targetable(worm):
 			continue
 		if worm.worm_color != worm_color:
 			continue

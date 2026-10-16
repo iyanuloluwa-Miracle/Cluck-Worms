@@ -6,10 +6,11 @@ extends Node
 # Tunables
 # ---------------------------------------------------------------------------
 
-@export var max_shake_offset: float = 18.0
-@export var shake_decay: float = 1.6
-@export var camera_follow_rate: float = 3.5
-@export var camera_action_pull: float = 0.22
+@export var max_shake_offset: float = 12.0
+@export var shake_decay: float = 1.9
+@export var camera_follow_rate: float = 3.0
+## Kept subtle: a strong pull moves the aim reference and hurts accuracy.
+@export var camera_action_pull: float = 0.08
 @export var hit_stop_scale: float = 0.07
 
 # ---------------------------------------------------------------------------
@@ -23,12 +24,18 @@ var _look_target: Vector2 = Vector2(640, 360)
 # Kept in sync with PathFactory.CHICKEN_NEST for action pull defaults.
 var _hit_stopping: bool = false
 var _fx_host: Node2D
+var _last_feedback_pos: Vector2 = Vector2(640, 300)
+## Recently spawned float texts [{"p": Vector2, "t": float}] used to avoid overlap.
+var _recent_texts: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	EventBus.cascade_step.connect(_on_cascade)
 	EventBus.chain_collapse_started.connect(_on_collapse)
+	EventBus.chain_reversing.connect(_on_reversing)
+	EventBus.boss_damaged.connect(_on_boss_damaged)
+	EventBus.boss_defeated.connect(_on_boss_defeated)
 	EventBus.projectile_hit_chain.connect(_on_projectile_hit)
 	EventBus.chicken_shot.connect(_on_shot)
 	EventBus.shot_resolve_finished.connect(_on_shot_resolved)
@@ -94,9 +101,26 @@ func spawn_float_text(world_pos: Vector2, text: String, color: Color) -> void:
 	if host == null:
 		return
 	_trim_fx(host)
+	var now: float = Time.get_ticks_msec() / 1000.0
+	var pos: Vector2 = world_pos
+	for i: int in range(_recent_texts.size() - 1, -1, -1):
+		var rec: Dictionary = _recent_texts[i]
+		if now - float(rec["t"]) > 0.6:
+			_recent_texts.remove_at(i)
+	var bumped: bool = true
+	var guard: int = 0
+	while bumped and guard < 6:
+		bumped = false
+		for rec: Dictionary in _recent_texts:
+			var other: Vector2 = rec["p"]
+			if absf(other.x - pos.x) < 110.0 and absf(other.y - pos.y) < 24.0:
+				pos.y = other.y - 26.0
+				bumped = true
+		guard += 1
+	_recent_texts.append({"p": pos, "t": now})
 	var ft := FloatText.new()
 	host.add_child(ft)
-	ft.global_position = world_pos
+	ft.global_position = pos
 	ft.setup(text, color)
 
 
@@ -124,7 +148,7 @@ func _update_camera(delta: float) -> void:
 	if _camera == null or not is_instance_valid(_camera):
 		return
 	_look_target = _look_target.lerp(_camera_home, 1.0 - exp(-1.8 * delta))
-	var desired: Vector2 = _camera_home.lerp(_look_target, 0.55)
+	var desired: Vector2 = _camera_home.lerp(_look_target, 0.35)
 	_camera.global_position = _camera.global_position.lerp(desired, 1.0 - exp(-camera_follow_rate * delta))
 	_camera.offset = _shake_offset()
 
@@ -198,7 +222,8 @@ func _on_unload() -> void:
 
 
 func _on_cascade(chain: WormChain, depth: int, count: int, color: WormColor.Kind) -> void:
-	var pos := _approx_chain_center(chain)
+	var pos := chain.last_match_position if chain.last_match_position != Vector2.ZERO else _approx_chain_center(chain)
+	_last_feedback_pos = pos
 	var fill: Color = WormColor.get_fill(color)
 	var intensity: float = 0.9 + float(count) * 0.1 + float(depth) * 0.2
 	spawn_pop(pos, fill, intensity)
@@ -221,21 +246,37 @@ func _on_collapse(_chain: WormChain, removed: int) -> void:
 	add_trauma(0.08 + float(removed) * 0.01)
 
 
+func _on_reversing(chain: WormChain) -> void:
+	var pos := chain.last_reverse_position if chain.last_reverse_position != Vector2.ZERO else _approx_chain_center(chain)
+	add_trauma(0.06)
+	if QualitySettings.enable_small_float_text:
+		spawn_float_text(pos + Vector2(0, -20), "REVERSE!", Color(0.55, 0.9, 1.0))
+
+
+func _on_boss_damaged(_id: StringName, amount: float, world_pos: Vector2) -> void:
+	spawn_pop(world_pos, Color(1.0, 0.45, 0.2), 0.85 + amount * 0.05)
+	add_trauma(0.18)
+	hit_stop(0.04)
+	pull_camera_toward(world_pos, 1.1)
+
+
+func _on_boss_defeated(_id: StringName) -> void:
+	add_trauma(0.55)
+	hit_stop(0.1)
+
+
 func _on_projectile_hit(projectile: ShootingWorm, hit: Worm, _chain: WormChain) -> void:
 	var pos: Vector2 = hit.global_position if is_instance_valid(hit) else projectile.global_position
 	spawn_pop(pos, WormColor.get_fill(projectile.worm_color), 0.7)
-	add_trauma(0.1)
-	pull_camera_toward(pos, 0.8)
 
 
-func _on_shot(_color: WormColor.Kind, origin: Vector2, _dir: Vector2) -> void:
-	add_trauma(0.04)
-	pull_camera_toward(origin, 0.25)
+func _on_shot(_color: WormColor.Kind, _origin: Vector2, _dir: Vector2) -> void:
+	pass
 
 
 func _on_shot_resolved(_chain: WormChain, scored: bool) -> void:
 	if scored and GameManager.combo >= 2:
-		spawn_float_text(_look_target + Vector2(0, -80), "COMBO x%d" % GameManager.combo, Color(1.0, 0.85, 0.3))
+		spawn_float_text(_last_feedback_pos + Vector2(0, -56), "COMBO x%d" % GameManager.combo, Color(1.0, 0.85, 0.3))
 
 
 func _on_good_shot(world_pos: Vector2, match_count: int) -> void:

@@ -19,7 +19,10 @@ Use this before shipping a build.
 
 ## Content
 
-- [ ] All 18 campaign levels clearable across 4 stages (Farmyard, Backyard, Apocalypse, Moonlit)
+- [ ] All 15 campaign levels clearable across 3 stages (Backyard, Wild Garden, Forbidden Coop)
+- [ ] Each stage boss (Garden Guardian, Worm Queen, Golden Rooster) is defeatable
+- [ ] Custom loading screen appears on fresh launch, then main menu
+- [ ] Chain reverses after matches (front rolls back; not forward-only collapse)
 - [ ] Stars (1-3) and personal best scores persist across sessions (`SaveService`)
 - [ ] Top 8 leaderboard tracks best runs
 - [ ] Icon / description / version set in Project Settings

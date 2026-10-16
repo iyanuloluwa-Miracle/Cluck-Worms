@@ -28,16 +28,35 @@ func _ready() -> void:
 
 
 func show_overlay() -> void:
-	var has_next: bool = GameManager.stage_index + 1 < GameManager.catalog.get_stage_count()
-	_next.text = "Next Stage" if has_next else "Back to Menu"
+	var finale: bool = _is_campaign_finale()
+	_title.text = "Campaign Complete!" if finale else "Stage Complete!"
+	_next.text = "Return to the Coop" if finale else "Next Stage  →"
+	# The finale has a single exit; a second "Main Menu" button would duplicate it.
+	_menu.visible = not finale
 	super.show_overlay()
+
+
+func _is_campaign_finale() -> bool:
+	return not GameManager.is_gauntlet_run and GameManager.stage_index + 1 >= GameManager.catalog.get_stage_count()
 
 
 func _on_stage_completed(stage_id: StringName, stage_index: int, score: int) -> void:
 	var stage: StageDef = GameManager.catalog.get_stage(stage_index)
 	var name_str: String = stage.display_name if stage else str(stage_id)
 	_body.add_theme_color_override("font_color", UITheme.YOLK_HOT)
-	_body.text = "★ %s Cleared! ★\n%s pts" % [name_str, _format_score(score)]
+	if _is_campaign_finale():
+		var stars: int = 0
+		var total: int = 0
+		for s: StageDef in GameManager.catalog.stages:
+			for level: LevelData in s.levels:
+				stars += SaveService.get_level_stars(level.id)
+				total += 3
+		_body.text = "The Golden Rooster has fallen!\nAll %d stages cleared  ·  ★ %d / %d\nFinal score %s pts\nReplay any level to chase three stars." % [
+			GameManager.catalog.get_stage_count(), stars, total, _format_score(score)]
+	else:
+		var next_stage: StageDef = GameManager.catalog.get_stage(stage_index + 1)
+		var unlock: String = "\nUnlocked: %s" % next_stage.display_name if next_stage else ""
+		_body.text = "★ %s Cleared! ★\n%s pts%s" % [name_str, _format_score(score), unlock]
 	UIFx.pulse_label(_body)
 
 

@@ -46,8 +46,13 @@ func _init() -> void:
 	)
 
 	var catalog := ProgressionCatalog.build_campaign()
-	failed += _expect(catalog.get_stage_count() == 4, "4 stages in campaign")
-	failed += _expect(catalog.get_total_level_count() == 18, "18 campaign levels")
+	failed += _expect(catalog.get_stage_count() == 3, "3 stages in campaign")
+	failed += _expect(catalog.get_total_level_count() == 15, "15 campaign levels")
+	var last_stage := catalog.get_stage(2)
+	failed += _expect(
+		last_stage != null and last_stage.get_level(4) != null and last_stage.get_level(4).is_boss_level,
+		"final level is Golden Rooster boss"
+	)
 
 	if failed == 0:
 		print("Cluck & Worms core tests: ALL PASSED")

@@ -20,8 +20,28 @@ signal chain_reached_end(chain: WormChain)
 signal chain_cleared(chain: WormChain)
 signal cascade_step(chain: WormChain, depth: int, count: int, color: WormColor.Kind)
 signal chain_collapse_started(chain: WormChain, removed_count: int)
+## Front segment is rolling backward to close a match gap (true reverse motion).
+signal chain_reversing(chain: WormChain)
 signal chain_collapse_finished(chain: WormChain)
 signal shot_resolve_finished(chain: WormChain, scored_match: bool)
+
+# ---------------------------------------------------------------------------
+# Boss encounters
+# ---------------------------------------------------------------------------
+
+signal boss_introduced(boss_id: StringName, display_name: String)
+signal boss_phase_changed(boss_id: StringName, phase: int)
+signal boss_health_changed(boss_id: StringName, current: float, maximum: float)
+signal boss_damaged(boss_id: StringName, amount: float, world_pos: Vector2)
+signal boss_defeated(boss_id: StringName)
+signal boss_attack(boss_id: StringName, attack_id: StringName)
+## Wind-up warning before an attack lands (duration in seconds).
+signal boss_telegraph(boss_id: StringName, attack_id: StringName, duration: float)
+## Readable status for HUD: &"vulnerable", &"shielded", &"weak", &"attacking", &"defeated".
+signal boss_status_changed(boss_id: StringName, status: StringName, detail: String)
+## A shot or match hit the boss while it could not be damaged.
+signal boss_blocked(boss_id: StringName, world_pos: Vector2)
+signal projectile_hit_boss(projectile: Node2D)
 
 # ---------------------------------------------------------------------------
 # Scoring / HUD
@@ -70,3 +90,14 @@ signal achievement_unlocked(achievement_id: StringName)
 signal tutorial_step(step_id: StringName)
 signal settings_changed()
 signal player_profile_changed(player_name: String)
+
+# ---------------------------------------------------------------------------
+# Abilities / objectives / meta
+# ---------------------------------------------------------------------------
+
+signal ability_charges_changed(slow_charges: int, bomb_charges: int)
+signal ability_used(ability_id: StringName)
+signal objective_progress_changed(label: String, ratio: float)
+signal objective_completed(kind: int)
+signal stats_changed()
+signal challenge_mode_changed(mode_id: StringName)
