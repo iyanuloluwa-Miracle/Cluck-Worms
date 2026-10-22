@@ -23,7 +23,7 @@ func _ready() -> void:
 	_retry.pressed.connect(func() -> void:
 		UIFx.punch_button(_retry)
 		# Restart the failed level with a fresh life pool (same stage/level).
-		GameManager.start_run(GameManager.stage_index, GameManager.level_index)
+		GameManager.restart_current_challenge()
 	)
 	_menu.pressed.connect(func() -> void:
 		UIFx.punch_button(_menu)

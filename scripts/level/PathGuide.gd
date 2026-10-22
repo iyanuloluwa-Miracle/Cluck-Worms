@@ -1,5 +1,5 @@
-extends Node2D
-## 10x Zuma-style carved physical track guide.
+﻿extends Node2D
+## Weathered kitchen-garden track with a stone burrow and a protected egg nest.
 ## Renders a multi-layered recessed trench carved into the terrain, dual guide rails,
 ## animated marching directional pearls, an earthen entry burrow, and a woven farmyard nest.
 
@@ -12,6 +12,10 @@ extends Node2D
 var _danger_pulse: float = 0.0
 var _danger_urgency: float = 0.0
 var _anim_time: float = 0.0
+var _redraw_accum: float = 0.0
+var _static_source: bool = false
+var _static_viewport: SubViewport
+var _static_art: Node2D
 
 # Cached point arrays for performance.
 var _cached_curve_version: int = -1
@@ -26,20 +30,58 @@ func _ready() -> void:
 	if path == null:
 		path = get_parent().get_node_or_null("WormPath") as Path2D
 	sample_step = QualitySettings.path_sample_step
-	EventBus.danger_warning.connect(_on_danger)
+	if not _static_source:
+		EventBus.danger_warning.connect(_on_danger)
 	_rebuild_cache()
 	queue_redraw()
+	if _static_source:
+		set_process(false)
+		return
+	_static_viewport = SubViewport.new()
+	_static_viewport.name = "TrackCache"
+	_static_viewport.size = Vector2i(1280, 720)
+	_static_viewport.disable_3d = true
+	_static_viewport.transparent_bg = true
+	_static_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_static_viewport)
+	_static_art = get_script().new()
+	_static_art.set("_static_source", true)
+	_static_art.set("path", path)
+	_static_art.set("sample_step", sample_step)
+	_static_art.set("danger_zone_length", danger_zone_length)
+	_static_art.set("trench_outer_width", trench_outer_width)
+	_static_art.set("trench_floor_width", trench_floor_width)
+	_static_viewport.add_child(_static_art)
+	var surface := Sprite2D.new()
+	surface.name = "CachedTrack"
+	surface.texture = _static_viewport.get_texture()
+	surface.centered = false
+	surface.show_behind_parent = true
+	add_child(surface)
+	if path and path.curve:
+		path.curve.changed.connect(_invalidate_static_cache)
+
+
+func _invalidate_static_cache() -> void:
+	_rebuild_cache()
+	queue_redraw()
+	if _static_art and _static_viewport:
+		_static_art.call("_rebuild_cache")
+		_static_art.queue_redraw()
+		_static_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _process(delta: float) -> void:
-	_anim_time += delta
+	if not SaveService.reduced_fx:
+		_anim_time += delta
 	if _danger_urgency > 0.0:
-		_danger_pulse = sin(_anim_time * (5.0 + _danger_urgency * 4.0)) * 0.5 + 0.5
+		_danger_pulse = 0.5 if SaveService.reduced_fx else sin(_anim_time * (5.0 + _danger_urgency * 4.0)) * 0.5 + 0.5
 	else:
-		if _danger_pulse > 0.0:
-			_danger_pulse = maxf(_danger_pulse - delta * 3.0, 0.0)
-	queue_redraw()
-
+		_danger_pulse = maxf(_danger_pulse - delta * 3.0, 0.0)
+	_redraw_accum += delta
+	if _redraw_accum >= (0.066 if QualitySettings.is_low() else 0.033):
+		_redraw_accum = 0.0
+		queue_redraw()
 
 func _on_danger(urgency: float) -> void:
 	_danger_urgency = maxf(urgency, 0.0)
@@ -95,109 +137,73 @@ func _rebuild_cache() -> void:
 func _draw() -> void:
 	if path == null or path.curve == null:
 		return
-
 	var curve: Curve2D = path.curve
 	var length: float = curve.get_baked_length()
 	if length <= 0.0:
 		return
-
 	if _cached_full_points.is_empty() or absf(_total_length - length) > 5.0:
 		_rebuild_cache()
-
 	if _cached_full_points.size() < 2:
 		return
 
-	# =========================================================================
-	# 1. LAYER 1: Deep Trench Ambient Shadow (Gives 3D depth into ground)
-	# =========================================================================
-	var trench_shadow_col := Color(0.015, 0.045, 0.02, 0.70)
-	draw_polyline(_cached_full_points, trench_shadow_col, trench_outer_width + 8.0, true)
+	if not _static_source:
+		_draw_danger_zone(curve, length)
+		if _danger_urgency > 0.0:
+			_draw_nest(curve, length)
+		return
 
-	# =========================================================================
-	# 2. LAYER 2: Earthen Berm / Outer Trench Embankment
-	# =========================================================================
-	var embankment_col := Color(0.065, 0.155, 0.085, 0.88)
-	draw_polyline(_cached_full_points, embankment_col, trench_outer_width, true)
-
-	# Soft lip highlight along upper rim.
-	var rim_bevel_col := Color(0.12, 0.26, 0.15, 0.45)
-	draw_polyline(_cached_full_points, rim_bevel_col, trench_outer_width - 4.0, true)
-
-	# =========================================================================
-	# 3. LAYER 3: Carved Trench Floor (Recessed bed where worms crawl)
-	# =========================================================================
-	var floor_col := Color(0.035, 0.085, 0.045, 0.98)
-	draw_polyline(_cached_full_points, floor_col, trench_floor_width, true)
-
-	# =========================================================================
-	# 4. LAYER 4: Dual Inner Track Rails (Subtle stone / metallic guide rails)
-	# =========================================================================
-	if _cached_left_rail.size() >= 2 and _cached_right_rail.size() >= 2:
-		var rail_col := Color(0.35, 0.52, 0.32, 0.28)
-		draw_polyline(_cached_left_rail, rail_col, 1.8, true)
-		draw_polyline(_cached_right_rail, rail_col, 1.8, true)
-
-	# =========================================================================
-	# 5. LAYER 5: Animated Directional Marching Pearls / Flow Energy
-	# =========================================================================
+	# Weathered garden edging: a stone lip, moss seam, and quiet dark soil.
+	draw_polyline(_cached_full_points, Color(0.07, 0.13, 0.09, 0.44), trench_outer_width + 11.0, true)
+	draw_polyline(_cached_full_points, Color("363d2b"), trench_outer_width + 3.0, true)
+	draw_polyline(_cached_full_points, Color("827851"), trench_outer_width, true)
+	draw_polyline(_cached_full_points, Color("9b9062"), trench_outer_width - 5.0, true)
+	draw_polyline(_cached_full_points, Color("475038"), trench_outer_width - 11.0, true)
+	draw_polyline(_cached_full_points, Color("273a2a"), trench_floor_width + 2.0, true)
+	draw_polyline(_cached_full_points, Color("30432f"), trench_floor_width - 6.0, true)
+	if _cached_left_rail.size() >= 2:
+		draw_polyline(_cached_left_rail, Color(0.05, 0.10, 0.07, 0.38), 1.5, true)
+		draw_polyline(_cached_right_rail, Color(0.67, 0.67, 0.39, 0.22), 1.2, true)
+	_draw_track_stones(curve, length)
 	_draw_marching_pearls(curve, length)
-
-	# =========================================================================
-	# 6. LAYER 6: The Danger Zone (Molten alert trench leading to the pit)
-	# =========================================================================
-	_draw_danger_zone(curve, length)
-
-	# =========================================================================
-	# 7. LAYER 7: Start Landmark (Earthen Burrow / Entrance Tunnel)
-	# =========================================================================
 	_draw_start_burrow(curve)
-
-	# =========================================================================
-	# 8. LAYER 8: End Landmark (Farmyard Nest — protect it!)
-	# =========================================================================
 	_draw_nest(curve, length)
 
 
+func _draw_track_stones(curve: Curve2D, length: float) -> void:
+	var d: float = 12.0
+	while d < length:
+		var xf: Transform2D = curve.sample_baked_with_rotation(d, false)
+		var p: Vector2 = _path_to_local(xf.origin)
+		var fwd: Vector2 = path.global_transform.basis_xform(xf.x).normalized()
+		var normal := Vector2(-fwd.y, fwd.x)
+		for side: float in [-1.0, 1.0]:
+			var inner: Vector2 = p + normal * side * (trench_floor_width * 0.5 + 4.0)
+			var outer: Vector2 = p + normal * side * (trench_outer_width * 0.5 - 1.5)
+			draw_line(inner, outer + fwd * 2.0, Color(0.21, 0.25, 0.17, 0.50), 1.3, true)
+			draw_line(inner + fwd * 2.0, outer + fwd * 4.0, Color(0.79, 0.74, 0.49, 0.24), 1.0, true)
+		d += 34.0
+
+
 func _draw_marching_pearls(curve: Curve2D, length: float) -> void:
-	var spacing: float = 44.0
-	var flow_speed: float = 62.0
-	var offset: float = fmod(_anim_time * flow_speed, spacing)
-
-	var d: float = offset
-	var danger_start: float = maxf(length - danger_zone_length, 0.0)
-
-	while d < danger_start:
+	# Widely spaced imprinted arrows communicate flow without a neon runway.
+	var d: float = 30.0
+	var end: float = maxf(length - danger_zone_length, 0.0)
+	while d < end:
 		var xf: Transform2D = curve.sample_baked_with_rotation(d, false)
 		var pt: Vector2 = _path_to_local(xf.origin)
 		var fwd: Vector2 = path.global_transform.basis_xform(xf.x).normalized()
-
-		# Soft golden-cream flow dot with subtle pulse.
-		var dot_pulse: float = sin(_anim_time * 3.0 + d * 0.05) * 0.2 + 0.8
-		var alpha: float = 0.38 * dot_pulse
-		var halo_color := Color(0.92, 0.96, 0.80, alpha * 0.4)
-		var core_color := Color(1.0, 0.96, 0.85, alpha)
-
-		# Outer glow halo.
-		draw_circle(pt, 4.0, halo_color)
-		# Inner core pearl.
-		draw_circle(pt, 2.2, core_color)
-
-		# Subtle directional arrow barb trailing behind pearl.
-		var barb_back: Vector2 = pt - fwd * 3.5
-		var barb_norm: Vector2 = Vector2(-fwd.y, fwd.x) * 2.2
-		draw_line(barb_back - barb_norm, pt, core_color, 1.2, true)
-		draw_line(barb_back + barb_norm, pt, core_color, 1.2, true)
-
-		d += spacing
-
+		var normal := Vector2(-fwd.y, fwd.x)
+		var col := Color(0.75, 0.76, 0.52, 0.21)
+		draw_polyline(PackedVector2Array([pt - fwd * 3 - normal * 3, pt + fwd * 2, pt - fwd * 3 + normal * 3]), col, 1.4, true)
+		d += 84.0
 
 func _draw_danger_zone(curve: Curve2D, length: float) -> void:
 	if _cached_danger_points.size() < 2:
 		return
 
 	# Base danger tint in the trench.
-	var danger_base_alpha: float = 0.35 + _danger_urgency * 0.40 + _danger_pulse * _danger_urgency * 0.25
-	var danger_col := Color(0.95, 0.22, 0.15, danger_base_alpha)
+	var danger_base_alpha: float = 0.45 + _danger_urgency * 0.35 + _danger_pulse * _danger_urgency * 0.20
+	var danger_col := Color(0.70, 0.30, 0.12, danger_base_alpha)
 
 	# Wide glowing threat bed.
 	if _danger_urgency > 0.15:
@@ -210,7 +216,7 @@ func _draw_danger_zone(curve: Curve2D, length: float) -> void:
 	# Animated chevron stripes across danger zone.
 	var danger_start: float = maxf(length - danger_zone_length, 0.0)
 	var stripe_spacing: float = 24.0
-	var stripe_offset: float = fmod(_anim_time * 80.0, stripe_spacing)
+	var stripe_offset: float = fmod(_anim_time * (25.0 + 35.0 * _danger_urgency), stripe_spacing)
 	var sd: float = danger_start + stripe_offset
 
 	while sd < length - 12.0:
@@ -232,27 +238,25 @@ func _draw_danger_zone(curve: Curve2D, length: float) -> void:
 
 
 func _draw_start_burrow(curve: Curve2D) -> void:
-	var start_xf: Transform2D = curve.sample_baked_with_rotation(0.0, false)
-	var pt: Vector2 = _path_to_local(start_xf.origin)
-
-	# Outer dirt mound (earthen rim).
-	draw_circle(pt, 24.0, Color(0.02, 0.06, 0.03, 0.60))
-	draw_circle(pt, 20.0, Color(0.09, 0.20, 0.11, 0.90))
-	draw_circle(pt, 16.5, Color(0.14, 0.30, 0.16, 0.95))
-
-	# Wooden / stone portal ring.
-	draw_circle(pt, 13.0, Color(0.24, 0.18, 0.12, 0.95))
-	draw_circle(pt, 11.0, Color(0.38, 0.28, 0.18, 0.90))
-
-	# Deep burrow void (black center).
-	draw_circle(pt, 8.5, Color(0.02, 0.04, 0.02, 1.0))
-
-	# Emerald emergence aura.
-	var aura_pulse: float = sin(_anim_time * 3.5) * 0.25 + 0.75
-	draw_circle(pt, 6.0, Color(0.25, 0.85, 0.42, 0.65 * aura_pulse))
-	draw_circle(pt, 3.5, Color(0.55, 1.0, 0.68, 0.90 * aura_pulse))
-	draw_circle(pt, 1.5, Color(0.95, 1.0, 0.95, 1.0))
-
+	var xf: Transform2D = curve.sample_baked_with_rotation(0.0, false)
+	var p: Vector2 = _path_to_local(xf.origin)
+	_fill_ellipse(p + Vector2(2, 8), Vector2(29, 22), Color(0.04, 0.10, 0.06, 0.44))
+	draw_circle(p, 25.0, Color("44432c"))
+	draw_circle(p + Vector2(0, -2), 22.0, Color("8b7952"))
+	draw_circle(p, 17.0, Color("54472f"))
+	draw_circle(p + Vector2(0, 2), 13.5, Color("15261b"))
+	# Stacked stones around the hollow; a real burrow instead of an energy portal.
+	for i: int in range(7):
+		var a: float = -PI + float(i) * PI / 6.0
+		var stone: Vector2 = p + Vector2.from_angle(a) * 21.0
+		_fill_ellipse(stone + Vector2(0, 1), Vector2(6.5, 5.7), Color("4d4c35"))
+		_fill_ellipse(stone, Vector2(5.5, 4.7), Color("a09566"))
+		_fill_ellipse(stone + Vector2(-1, -1.5), Vector2(3.5, 1.3), Color("b9ac78"))
+	draw_arc(p + Vector2(0, 2), 14.0, 0.2, PI - 0.2, 16, Color("354931"), 2.5, true)
+	for side: float in [-1.0, 1.0]:
+		var grass: Vector2 = p + Vector2(side * 24.0, 8)
+		draw_line(grass, grass + Vector2(side * 7, -14), Color("7c8d50"), 2.0, true)
+		draw_line(grass, grass + Vector2(side * 2, -18), Color("9aa463"), 1.6, true)
 
 func _draw_nest(curve: Curve2D, length: float) -> void:
 	var end_xf: Transform2D = curve.sample_baked_with_rotation(length, false)
@@ -270,7 +274,7 @@ func _draw_nest(curve: Curve2D, length: float) -> void:
 		draw_circle(pt, flare_r, Color(1.0, 0.25, 0.08, 0.12 + urgency * 0.28 + pulse * 0.12))
 		draw_circle(pt, flare_r * 0.72, Color(1.0, 0.45, 0.1, 0.1 + urgency * 0.2))
 
-	# Outer woven straw bowl — layered ring strands.
+	# Outer woven straw bowl â€” layered ring strands.
 	var outer_r: float = 30.0 * breathe
 	_fill_ellipse(pt + Vector2(0, 3), Vector2(outer_r + 2, outer_r * 0.78), Color(0.28, 0.16, 0.06, 0.95))
 	_fill_ellipse(pt + Vector2(0, 2), Vector2(outer_r, outer_r * 0.74), Color(0.42, 0.26, 0.10, 0.98))
@@ -286,7 +290,7 @@ func _draw_nest(curve: Curve2D, length: float) -> void:
 		var rr: float = (outer_r - 2.0) - float(ring) * 3.2
 		var fibers: int = 18 + ring * 4
 		for i: int in range(fibers):
-			var a: float = float(i) / float(fibers) * TAU + float(ring) * 0.35 + _anim_time * 0.05
+			var a: float = float(i) / float(fibers) * TAU + float(ring) * 0.35
 			var wobble: float = sin(a * 3.0 + float(ring)) * 2.2
 			var p0: Vector2 = pt + Vector2(cos(a), sin(a) * 0.74) * (rr - 3.0 + wobble)
 			var p1: Vector2 = pt + Vector2(cos(a + 0.18), sin(a + 0.18) * 0.74) * (rr + 1.5 + wobble * 0.5)

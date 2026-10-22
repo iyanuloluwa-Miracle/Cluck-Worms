@@ -12,6 +12,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if SaveService.reduced_fx or not is_visible_in_tree():
+		return
 	_time += delta
 	_worm_phase += delta * 0.22
 	queue_redraw()

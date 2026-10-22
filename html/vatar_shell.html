@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 	<title>$GODOT_PROJECT_NAME</title>
 	<style>
 html, body, #canvas {
@@ -12,7 +12,7 @@ html, body, #canvas {
 }
 body {
 	color: white;
-	background-color: black;
+	background-color: #10231b;
 	overflow: hidden;
 	touch-action: none;
 }
@@ -32,7 +32,7 @@ body {
 	bottom: 0;
 }
 #status {
-	background-color: #242424;
+	background: radial-gradient(ellipse at 50% 35%, #365333, #10231b 72%);
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -60,7 +60,9 @@ body {
 }
 #status-progress {
 	bottom: 10%;
-	width: 50%;
+	width: min(72%, 420px);
+	height: 8px;
+	accent-color: #f6cb5a;
 	margin: 0 auto;
 }
 #status-notice {
@@ -83,7 +85,7 @@ body {
 	max-width: 28rem;
 	text-align: center;
 	font: 500 0.95rem/1.4 system-ui, sans-serif;
-	color: #d8d8d8;
+	color: #e4ead6;
 }
 #vatar-banner {
 	display: none;
@@ -100,16 +102,33 @@ body {
 	pointer-events: none;
 }
 	</style>
+
 	$GODOT_HEAD_INCLUDE
+	<style>
+#loading-brand { font: 900 clamp(28px, 5vw, 54px)/1.1 system-ui, sans-serif; letter-spacing: -.06em; color: #ffdc70; z-index: 1; margin: 0 20px 14px; text-shadow: 0 4px #17271a; }
+#loading-brand span { color: #a7df83; }
+#loading-copy { font: 600 12px/1.5 system-ui, sans-serif; letter-spacing: .2em; text-transform: uppercase; color: #b8cbaa; z-index: 1; }
+#status-hint { position: relative; z-index: 1; margin-top: 30px; font-size: 13px; }
+#status-progress { bottom: 22%; border: 0; border-radius: 6px; }
+#fullscreen { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); z-index: 20; border: 1px solid #a1bc8960; border-radius: 12px; color: #e8efd8; background: #142a1ee6; padding: 10px 14px; font: 600 12px system-ui; cursor: pointer; }
+#fullscreen[hidden] { display: none; }
+#orientation-hint { display: none; position: fixed; bottom: 18%; left: 8%; right: 8%; text-align: center; font: 500 14px/1.6 system-ui; color: #d3ddc8; pointer-events: none; }
+@media (orientation: portrait) and (max-width: 750px) { #orientation-hint { display: block; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+	</style>
 	<script src="https://lagoslife.app/sdk/vatar-games-v1.js"></script>
 </head>
 <body>
 	<div id="vatar-banner"></div>
-	<canvas id="canvas">
+	<canvas id="canvas" aria-label="Cluck and Worms arcade playfield. Aim and click to fire. Space swaps worms. Escape pauses." tabindex="0">
 		Your browser does not support the canvas tag.
 	</canvas>
 	<noscript>Your browser does not support JavaScript.</noscript>
+	<button id="fullscreen" type="button" aria-label="Enter fullscreen" hidden>Fullscreen</button>
+	<div id="orientation-hint">Turn your phone sideways for a larger playfield.<br>Your game stays paused while you switch.</div>
 	<div id="status">
+		<h1 id="loading-brand">CLUCK <span>&amp; WORMS</span></h1>
+		<div id="loading-copy">Small chicken. Big chain reactions.</div>
 		<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
 		<progress id="status-progress"></progress>
 		<div id="status-hint">Downloading…</div>
@@ -123,11 +142,27 @@ const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
 const engine = new Engine(GODOT_CONFIG);
 
 /** Bridge used by Godot (VatarBridge.gd) and the Lagos Life / Vatar SDK. */
+const fullscreenButton = document.getElementById("fullscreen");
+fullscreenButton.hidden = !document.fullscreenEnabled;
+fullscreenButton.addEventListener("click", async () => {
+	try {
+		if (document.fullscreenElement) await document.exitFullscreen();
+		else await document.documentElement.requestFullscreen();
+	} catch (_) { fullscreenButton.hidden = true; }
+});
+document.addEventListener("fullscreenchange", () => {
+	const label = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
+	fullscreenButton.textContent = label;
+	fullscreenButton.setAttribute("aria-label", label);
+	document.getElementById("canvas").focus();
+});
 window.CluckVatar = {
 	ready: false,
 	player: null,
 	mode: null,
 	_pauseCbs: [],
+	_browserPauseCbs: [],
+	onBrowserPause(fn) { this._browserPauseCbs.push(fn); },
 	_resumeCbs: [],
 	_purchaseCbs: [],
 	onPause(fn) { this._pauseCbs.push(fn); },
@@ -191,6 +226,12 @@ window.CluckVatar = {
 	},
 };
 
+function pauseForBrowserChange() {
+	window.CluckVatar._browserPauseCbs.forEach(fn => { try { fn(); } catch (_) {} });
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) pauseForBrowserChange(); });
+if (screen.orientation) screen.orientation.addEventListener("change", pauseForBrowserChange);
+
 (function () {
 	const statusOverlay = document.getElementById("status");
 	const statusProgress = document.getElementById("status-progress");
@@ -232,6 +273,42 @@ window.CluckVatar = {
 		setStatusNotice(err instanceof Error ? err.message : String(err || "An unknown error occurred."));
 		setStatusMode("notice");
 		initializing = false;
+	}
+
+	// Emscripten's default-framebuffer blit queries SCISSOR_TEST each frame.
+	// On some ANGLE drivers that query synchronously drains the GPU queue.
+	// Mirror only this boolean, on our canvas only. Other GL queries pass through.
+	// ?native_gl_queries=1 keeps an unmodified context for A/B profiling.
+	if (!new URLSearchParams(location.search).has("native_gl_queries")) {
+		const canvas = document.getElementById("canvas");
+		const getContext = canvas.getContext.bind(canvas);
+		const wrapped = new WeakSet();
+		canvas.getContext = function (type, attributes) {
+			const gl = getContext(type, attributes);
+			if (!gl || type !== "webgl2" || wrapped.has(gl)) return gl;
+			wrapped.add(gl);
+			const getParameter = gl.getParameter.bind(gl);
+			const enable = gl.enable.bind(gl);
+			const disable = gl.disable.bind(gl);
+			let scissor;
+			gl.enable = function (capability) {
+				enable(capability);
+				if (capability === gl.SCISSOR_TEST) scissor = true;
+			};
+			gl.disable = function (capability) {
+				disable(capability);
+				if (capability === gl.SCISSOR_TEST) scissor = false;
+			};
+			gl.getParameter = function (parameter) {
+				if (parameter !== gl.SCISSOR_TEST) return getParameter(parameter);
+				if (scissor === undefined) scissor = getParameter(parameter);
+				return scissor;
+			};
+			// Restored contexts reset their state; never reuse the previous value.
+			canvas.addEventListener("webglcontextlost", () => { scissor = undefined; });
+			canvas.addEventListener("webglcontextrestored", () => { scissor = undefined; });
+			return gl;
+		};
 	}
 
 	const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });

@@ -27,6 +27,7 @@ const FOOTER_BG := Color(0.06, 0.10, 0.06, 0.92)
 @onready var _cell_bonus: PanelContainer = $Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Bonus
 @onready var _cell_swap: PanelContainer = $Center/StoneFrame/Inner/Fill/Pad/VBox/Grid/BottomRow/Swap
 
+var _training_btn: Button
 var _ok_pulse: Tween
 var _cells: Array[PanelContainer] = []
 
@@ -41,6 +42,20 @@ func _ready() -> void:
 	_frame.draw.connect(_draw_frame)
 	_frame.resized.connect(_frame.queue_redraw)
 	_ok_btn.pressed.connect(_on_ok)
+	_training_btn = Button.new()
+	_training_btn.name = "TrainingButton"
+	_training_btn.text = "PLAY TRAINING"
+	_training_btn.custom_minimum_size = Vector2(190, 56)
+	UITheme.apply_font(_training_btn, UITheme.WEIGHT_BOLD)
+	_training_btn.add_theme_font_size_override("font_size", 18)
+	_training_btn.add_theme_color_override("font_color", GOLD_LIGHT)
+	_training_btn.add_theme_stylebox_override("normal", _jade_btn(FILL_GREEN))
+	_training_btn.add_theme_stylebox_override("hover", _jade_btn(JADE))
+	_training_btn.add_theme_stylebox_override("focus", _jade_btn(JADE))
+	var footer: HBoxContainer = _ok_btn.get_parent()
+	footer.add_child(_training_btn)
+	footer.move_child(_training_btn, _ok_btn.get_index())
+	_training_btn.pressed.connect(_on_play_training)
 
 
 func open_instructions(_from_startup: bool = false) -> void:
@@ -48,6 +63,14 @@ func open_instructions(_from_startup: bool = false) -> void:
 	visible = true
 	modulate.a = 0.0
 	_frame.queue_redraw()
+	_ok_btn.grab_focus()
+	if SaveService.reduced_fx:
+		modulate.a = 1.0
+		_frame.scale = Vector2.ONE
+		for cell: PanelContainer in _cells:
+			cell.modulate.a = 1.0
+			cell.scale = Vector2.ONE
+		return
 	_frame.scale = Vector2(0.86, 0.86)
 	_frame.pivot_offset = _frame.size * 0.5
 
@@ -106,8 +129,8 @@ func _style() -> void:
 
 	_style_cell(
 		_cell_shoot,
-		"SHOOT WORMS BY CLICKING WHERE YOU WANT THEM TO GO.",
-		"THE COLOR ON THE CHICKEN'S BACK SHOWS YOUR NEXT WORM."
+		"CLICK TO FIRE. ON TOUCH, DRAG TO AIM AND LIFT TO FIRE.",
+		"NOW AND NEXT SHOW YOUR AMMO. MATCHING SYMBOLS SHARE A COLOR."
 	)
 	_style_cell(
 		_cell_match,
@@ -266,7 +289,7 @@ func _draw_frame() -> void:
 
 func _start_ok_pulse() -> void:
 	_stop_ok_pulse()
-	if not is_instance_valid(_ok_btn):
+	if SaveService.reduced_fx or not is_instance_valid(_ok_btn):
 		return
 	_ok_btn.pivot_offset = _ok_btn.size * 0.5
 	_ok_pulse = create_tween()
@@ -288,3 +311,12 @@ func _on_ok() -> void:
 	SaveService.set_tutorial_done(_dont_show.button_pressed)
 	UIFx.punch_button(_ok_btn)
 	close_instructions()
+
+
+func _on_play_training() -> void:
+	_stop_ok_pulse()
+	SaveService.set_field_guide_done(false)
+	SaveService.set_tutorial_done(_dont_show.button_pressed)
+	visible = false
+	closed.emit()
+	GameManager.start_run(0, 0)

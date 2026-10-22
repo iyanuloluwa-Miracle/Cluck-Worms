@@ -1,0 +1,22 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+--- Smoke Testing All Scenes ---
+  OK  res://scenes/ui/LoadingScreen.tscn
+  OK  res://scenes/main/Main.tscn
+  OK  res://scenes/level/Level.tscn
+  OK  res://scenes/chicken/Chicken.tscn
+  OK  res://scenes/worm/Worm.tscn
+  OK  res://scenes/projectile/ShootingWorm.tscn
+  OK  res://scenes/ui/HUD.tscn
+  OK  res://scenes/ui/MainMenuUI.tscn
+  OK  res://scenes/ui/PauseUI.tscn
+  OK  res://scenes/ui/SettingsUI.tscn
+  OK  res://scenes/ui/LevelSelectUI.tscn
+  OK  res://scenes/ui/LevelCompleteUI.tscn
+  OK  res://scenes/ui/StageCompleteUI.tscn
+  OK  res://scenes/ui/GameOverUI.tscn
+  OK  res://scenes/ui/PlayerProfileUI.tscn
+  OK  res://scenes/ui/InstructionsUI.tscn
+  OK  res://scenes/ui/StatsUI.tscn
+ALL SCENES INSTANTIATED SUCCESSFULLY!
+

@@ -1,0 +1,8 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+OK   stage_backyard: 17.1s audio in 1082 ms, rms=0.163, bed_rms=0.179, deterministic=true
+OK   stage_garden: 19.2s audio in 1066 ms, rms=0.162, bed_rms=0.193, deterministic=true
+OK   stage_coop: 20.9s audio in 1036 ms, rms=0.125, bed_rms=0.143, deterministic=true
+OK   stage_boss: 14.5s audio in 795 ms, rms=0.150, bed_rms=0.167, deterministic=true
+OK   incremental render matches blocking render (157 frames at 4 ms)
+

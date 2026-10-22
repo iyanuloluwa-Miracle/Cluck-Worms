@@ -1,0 +1,22 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  OK  score objective has display name
+  OK  achievement catalog populated
+  OK  boss slayer title
+  OK  15 levels
+  OK  score level has target
+  OK  boss objective wired
+  OK  survive level has duration
+  OK  shot limit set
+  OK  score level has target
+  OK  boss objective wired
+  OK  shot limit set
+  OK  score level has target
+  OK  boss objective wired
+  OK  has score-target levels
+  OK  has survive level
+  OK  has limited-shot level
+  OK  three boss objectives
+  OK  daily seed stable
+Cluck & Worms meta tests: ALL PASSED
+

@@ -1,0 +1,6 @@
+live gameplay: frame median 16.72ms p95 21.50ms; process 39.59ms; draw calls 179
+Frozen isolation worm count: 18
+frozen full scene: frame median 16.66ms p95 18.06ms; process 29.25ms; draw calls 179
+without backdrop: frame median 16.70ms p95 17.75ms; process 18.00ms; draw calls 178
+without track: frame median 16.66ms p95 17.68ms; process 19.04ms; draw calls 174
+Renderer: Intel(R) UHD Graphics 620

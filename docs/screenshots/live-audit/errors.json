@@ -1,0 +1,6 @@
+[
+  "ERROR: Can't open file from path 'res://audio/music/menu_farmyard_loop.ogg'.",
+  "   at: get_file_as_bytes (core/io/file_access.cpp:907)",
+  "ERROR: Cannot open file 'res://audio/music/menu_farmyard_loop.ogg'.",
+  "   at: load_from_file (modules/vorbis/audio_stream_ogg_vorbis.cpp:703)"
+]

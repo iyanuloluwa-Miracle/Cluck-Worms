@@ -38,6 +38,11 @@ func _ready() -> void:
 		print("  OK  ", path)
 		instance.queue_free()
 	
+	await get_tree().process_frame
+	await get_tree().process_frame
+	AudioManager.stop_music()
+	AudioManager._music_player.stream = null
+	await get_tree().process_frame
 	if failed == 0:
 		print("ALL SCENES INSTANTIATED SUCCESSFULLY!")
 		get_tree().quit(0)

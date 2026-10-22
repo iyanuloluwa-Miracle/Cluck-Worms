@@ -48,7 +48,17 @@ func _ready() -> void:
 	_test_tunnel_worms_untargetable()
 	_test_chain_cleared()
 	_test_fuzz_invariants()
+	_test_swept_contact_and_insertion()
+	_test_projectile_target_order_and_gap()
+	_test_aim_preview_contact()
+	_test_shot_uses_fresh_pointer()
+	_test_touch_pointer_and_swap()
+	_test_rainbow_span_match()
+	_test_march_join_keeps_cascade_depth()
 
+	# Allow queued scenes, projectile trails and swap tweens to be reclaimed.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveService.save_path))
 	if _failed == 0:
 		print("Cluck & Worms chain tests: ALL PASSED")
@@ -377,3 +387,162 @@ func _test_fuzz_invariants() -> void:
 			_expect(false, "fuzz trial %d: chain settles" % trial)
 		_dispose(chain)
 	_expect(total_ok, "fuzz: 6 trials x 900 steps keep spacing, indices and counts valid")
+
+
+# Regressions for pointer accuracy, first contact and wildcard/cascade edges.
+func _test_swept_contact_and_insertion() -> void:
+	var shot: ShootingWorm = preload("res://scenes/projectile/ShootingWorm.tscn").instantiate()
+	add_child(shot)
+	shot.set_physics_process(false)
+	var contact: Dictionary = shot._segment_circle_hit(Vector2.ZERO, Vector2(200, 0), Vector2(100, 0), 20.0)
+	_expect(not contact.is_empty() and is_equal_approx(float(contact["t"]), 0.4), "sweep returns first surface contact, not the worm center")
+	var inside: Dictionary = shot._segment_circle_hit(Vector2(95, 0), Vector2(200, 0), Vector2(100, 0), 20.0)
+	_expect(not inside.is_empty() and is_zero_approx(float(inside["t"])), "sweep starting inside a target reports immediate contact")
+	var chain := _make_chain([R], 100.0)
+	shot.launch(B, Vector2.ZERO, Vector2.RIGHT, chain)
+	shot.global_position = Vector2(200, 0)
+	shot._test_chain_collision()
+	_expect(_colors(chain) == [R, B], "rear-facing impact inserts behind the worm even during a long frame")
+	_dispose(chain)
+
+
+func _test_aim_preview_contact() -> void:
+	var chain := _make_chain([R], 200.0)
+	var guide: Node2D = preload("res://scripts/chicken/AimGuide.gd").new()
+	add_child(guide)
+	guide.update_trajectory(R, 52.0, chain, 0.0, Vector2.ZERO)
+	var expected: float = 200.0 - 16.0 - Worm.HEAD_RADIUS * 0.85
+	_expect(is_equal_approx(float(guide.get("_current_target_dist")), expected), "aim guide includes muzzle offset and uses actual projectile contact")
+	guide.queue_free()
+	_dispose(chain)
+
+
+func _make_chicken() -> Chicken:
+	var chicken: Chicken = preload("res://scenes/chicken/Chicken.tscn").instantiate()
+	add_child(chicken)
+	chicken.set_process(false)
+	chicken.position = Vector2(400, 350)
+	return chicken
+
+
+func _test_shot_uses_fresh_pointer() -> void:
+	var previous_state: GameManager.State = GameManager.state
+	GameManager.state = GameManager.State.PLAYING
+	var chicken := _make_chicken()
+	chicken.aim_at(chicken.global_position + Vector2.LEFT * 250.0)
+	chicken.set("_pointer_pos", chicken.global_position + Vector2.RIGHT * 250.0)
+	var directions: Array[Vector2] = []
+	var on_shot := func(_color: WormColor.Kind, _origin: Vector2, direction: Vector2) -> void: directions.append(direction)
+	EventBus.chicken_shot.connect(on_shot)
+	chicken.shoot_now()
+	EventBus.chicken_shot.disconnect(on_shot)
+	_expect(directions.size() == 1 and directions[0].dot(Vector2.RIGHT) > 0.9999, "click fires at the current pointer, even after an immediate 180-degree turn")
+	chicken.queue_free()
+	GameManager.state = previous_state
+
+
+func _test_touch_pointer_and_swap() -> void:
+	var previous_state: GameManager.State = GameManager.state
+	GameManager.state = GameManager.State.PLAYING
+	var chicken := _make_chicken()
+	var touch := InputEventScreenTouch.new()
+	touch.index = 3
+	touch.pressed = true
+	touch.position = chicken.get_canvas_transform() * (chicken.global_position + Vector2(200, -100))
+	var shots_before: int = GameManager.shots_fired
+	chicken._unhandled_input(touch)
+	_expect(GameManager.shots_fired == shots_before, "menu touch that creates the launcher cannot also fire a shot")
+	chicken._handle_touch(touch)
+	var touch_aim: Vector2 = chicken.get("_pointer_pos")
+	touch.pressed = false
+	chicken._handle_touch(touch)
+	chicken._update_pointer_from_devices()
+	_expect((chicken.get("_pointer_pos") as Vector2).is_equal_approx(touch_aim), "touch aim stays in place after lifting the finger")
+	chicken.current_color = R
+	chicken.next_color = B
+	touch.pressed = true
+	touch.position = chicken.get_canvas_transform() * chicken.global_position
+	chicken._handle_touch(touch)
+	_expect(chicken.current_color == B and chicken.next_color == R, "single tap on the chicken swaps the loadout immediately")
+	touch.pressed = false
+	chicken._input(touch)
+	_expect((chicken.get("_touch_ids") as Dictionary).is_empty(), "touch release over a UI control cannot leave a held finger")
+	var viewport := chicken.get_viewport()
+	var original_canvas: Transform2D = viewport.canvas_transform
+	viewport.canvas_transform = Transform2D(0.0, Vector2(0.7, 0.7), 0.0, Vector2(80, 40))
+	var world_target: Vector2 = chicken.global_position + Vector2(200, -100)
+	touch.position = chicken.get_canvas_transform() * world_target
+	touch.pressed = true
+	chicken._handle_touch(touch)
+	_expect((chicken.get("_pointer_pos") as Vector2).is_equal_approx(world_target), "scaled and translated touch coordinates resolve to the correct world target")
+	viewport.canvas_transform = original_canvas
+	get_tree().paused = true
+	_expect((chicken.get("_touch_ids") as Dictionary).is_empty(), "pausing releases fingers before resume")
+	get_tree().paused = false
+	touch.position = chicken.get_canvas_transform() * (chicken.global_position + Vector2(200, -100))
+	chicken._handle_touch(touch)
+	chicken._notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	_expect((chicken.get("_touch_ids") as Dictionary).is_empty(), "browser focus loss releases touch state")
+	chicken._handle_touch(touch)
+	chicken.set_shooting_enabled(false)
+	_expect((chicken.get("_touch_ids") as Dictionary).is_empty(), "disabling controls releases held touch fingers")
+	chicken.queue_free()
+	GameManager.state = previous_state
+
+
+func _test_rainbow_span_match() -> void:
+	var chain := _make_chain([B, G, G, G, B], 600.0)
+	for i: int in [1, 2, 3]:
+		chain.get_worms()[i].worm_type = WormType.Kind.RAINBOW
+	var run: Array[int] = chain._find_run(2)
+	_expect(run.size() == 5, "rainbow seed looks through adjacent wildcards to both real colors")
+	_dispose(chain)
+
+
+func _test_march_join_keeps_cascade_depth() -> void:
+	var chain := _make_chain([B, G, G, R, R, G, Y], 800.0)
+	chain.insert_at(3, false, R)
+	chain.step(WormChain.INSERT_SETTLE_TIME + DT)
+	_expect(_cascades == [0], "cascade setup opens a matching gap")
+	# A long frame can let the rear close the gap before reverse processing.
+	chain.march_speed = 400.0
+	chain.step(0.5)
+	_expect(_cascades == [0, 1], "rear-driven gap closure preserves the earned cascade depth")
+	_dispose(chain)
+
+
+func _test_projectile_target_order_and_gap() -> void:
+	var chain := _make_chain([R, B, G], 500.0)
+	var worms: Array[Worm] = chain.get_worms()
+	worms[0].global_position = Vector2(100, 26)
+	worms[1].global_position = Vector2(108, 0)
+	worms[2].global_position = Vector2(300, 0)
+	var first_target: Worm = worms[1]
+	var targets: Array[Worm] = []
+	var on_hit := func(_shot: ShootingWorm, hit: Worm, _chain: WormChain) -> void: targets.append(hit)
+	EventBus.projectile_hit_chain.connect(on_hit)
+	var shot: ShootingWorm = preload("res://scenes/projectile/ShootingWorm.tscn").instantiate()
+	add_child(shot)
+	shot.set_physics_process(false)
+	shot.launch(Y, Vector2.ZERO, Vector2.RIGHT, chain)
+	shot.global_position = Vector2(350, 0)
+	shot._test_chain_collision()
+	_expect(targets.size() == 1 and targets[0] == first_target, "overlapping targets choose the first contacted surface, not the closest center")
+	# Insertion above changed array indices; build an independent gap fixture.
+	_dispose(chain)
+	chain = _make_chain([R, B, G], 500.0)
+	worms = chain.get_worms()
+	worms[0].global_position = Vector2(100, 40)
+	worms[1].global_position = Vector2(100, -40)
+	worms[2].global_position = Vector2(300, 0)
+	var far_target: Worm = worms[2]
+	targets.clear()
+	shot = preload("res://scenes/projectile/ShootingWorm.tscn").instantiate()
+	add_child(shot)
+	shot.set_physics_process(false)
+	shot.launch(Y, Vector2.ZERO, Vector2.RIGHT, chain)
+	shot.global_position = Vector2(350, 0)
+	shot._test_chain_collision()
+	_expect(targets.size() == 1 and targets[0] == far_target, "a high-speed shot passes through a real gap to the far chain")
+	EventBus.projectile_hit_chain.disconnect(on_hit)
+	_dispose(chain)

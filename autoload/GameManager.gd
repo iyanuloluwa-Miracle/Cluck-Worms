@@ -44,6 +44,7 @@ var state: State = State.MAIN_MENU
 var score: int = 0
 var combo: int = 0
 var peak_combo: int = 0
+var level_peak_combo: int = 0
 var lives: int = 3
 var is_paused: bool = false
 
@@ -55,6 +56,7 @@ var current_level_def: LevelData = null
 var active_color_count: int = WormColor.KIND_COUNT
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _fx_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _state_before_pause: State = State.PLAYING
 ## Cascades triggered during the current level (for stars / achievements).
 var cascades_this_level: int = 0
@@ -87,6 +89,7 @@ var _accel_bonus: float = 0.0
 
 func _ready() -> void:
 	_rng.randomize()
+	_fx_rng.randomize()
 	lives = starting_lives
 	catalog = ProgressionCatalog.build_default()
 	sanitize_save()
@@ -106,6 +109,7 @@ func _process(delta: float) -> void:
 	_tick_accelerating_chain(delta)
 	_tick_survive_objective(delta)
 	_emit_objective_progress()
+	_check_shot_limit_fail()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -143,6 +147,12 @@ func can_player_act() -> bool:
 	return state == State.PLAYING and not is_paused
 
 
+func can_fire_projectile() -> bool:
+	if not can_player_act():
+		return false
+	return current_level_def == null or current_level_def.objective != LevelObjective.Kind.LIMITED_SHOTS or current_level_def.shot_limit <= 0 or shots_fired < current_level_def.shot_limit
+
+
 func get_current_stage() -> StageDef:
 	return catalog.get_stage(stage_index) if catalog else null
 
@@ -153,6 +163,18 @@ func get_combo_multiplier() -> float:
 
 func get_rng() -> RandomNumberGenerator:
 	return _rng
+
+
+## Cosmetic animation, particles and sound must never alter the next worm.
+func get_fx_rng() -> RandomNumberGenerator:
+	return _fx_rng
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+		if state == State.PLAYING:
+			pause_game()
+
 
 
 func roll_worm_color() -> WormColor.Kind:
@@ -390,7 +412,9 @@ func retry_level() -> void:
 	if current_level_def == null:
 		go_to_main_menu()
 		return
+	score = level_start_score
 	combo = 0
+	EventBus.score_changed.emit(score, 0)
 	EventBus.combo_changed.emit(combo)
 	_set_tree_paused(false)
 	is_paused = false
@@ -398,7 +422,17 @@ func retry_level() -> void:
 
 
 func restart_run() -> void:
-	start_run(stage_index, 0)
+	start_run(stage_index, 0, is_gauntlet_run)
+
+
+## Retry keeps the selected mode and level, including practice's save isolation.
+func restart_current_challenge() -> void:
+	if challenge_mode == &"practice":
+		start_practice(stage_index, level_index)
+	elif challenge_mode == &"daily":
+		start_daily_challenge()
+	else:
+		start_run(stage_index, level_index, is_gauntlet_run)
 
 
 func advance_after_level_complete() -> void:
@@ -468,6 +502,16 @@ func notify_shot_resolved(scored_match: bool) -> void:
 		reset_combo()
 
 
+func try_swap_ammo() -> bool:
+	if not can_player_act():
+		return false
+	var chicken := _find_active_chicken()
+	if chicken == null:
+		return false
+	chicken.swap_worms()
+	return true
+
+
 func try_use_slow_ability() -> bool:
 	if not can_player_act() or slow_charges <= 0:
 		return false
@@ -523,6 +567,7 @@ func add_score(base_points: int) -> void:
 func increment_combo() -> void:
 	combo += 1
 	peak_combo = maxi(peak_combo, combo)
+	level_peak_combo = maxi(level_peak_combo, combo)
 	EventBus.combo_changed.emit(combo)
 
 
@@ -563,6 +608,7 @@ func _load_current_level() -> void:
 	elif level_def.tight_palette:
 		active_color_count = clampi(mini(active_color_count, 4), 3, WormColor.KIND_COUNT)
 	cascades_this_level = 0
+	level_peak_combo = 0
 	last_level_stars = 0
 	level_start_score = score
 	shots_fired = 0
@@ -673,7 +719,6 @@ func _on_chicken_shot(_color: WormColor.Kind, _o: Vector2, _d: Vector2) -> void:
 		return
 	shots_fired += 1
 	SaveService.record_shot()
-	_check_shot_limit_fail()
 	_emit_objective_progress()
 
 
@@ -705,6 +750,8 @@ func _lose_life() -> void:
 
 
 func _submit_high_score() -> bool:
+	if suppress_progress_save:
+		return false
 	var is_new: bool = SaveService.try_submit_score(score, peak_combo)
 	EventBus.high_score_changed.emit(SaveService.high_score, is_new)
 	return is_new
@@ -782,7 +829,7 @@ func _check_combo_objective() -> void:
 		return
 	if current_level_def.objective != LevelObjective.Kind.COMBO_TARGET:
 		return
-	if peak_combo >= current_level_def.target_combo:
+	if level_peak_combo >= current_level_def.target_combo:
 		_complete_objective()
 
 
@@ -793,8 +840,20 @@ func _check_shot_limit_fail() -> void:
 		return
 	if current_level_def.shot_limit <= 0:
 		return
-	if shots_fired > current_level_def.shot_limit and not objective_met:
-		_lose_life()
+	if shots_fired < current_level_def.shot_limit or objective_met:
+		return
+	# Let the last projectile and all of its cascades resolve before judging it.
+	var chicken := _find_active_chicken()
+	if chicken and is_instance_valid(chicken):
+		var projectiles: Node = chicken.get_parent().get_node_or_null("Projectiles")
+		if projectiles:
+			for projectile: Node in projectiles.get_children():
+				if projectile is ShootingWorm and projectile.is_alive:
+					return
+	var chain := _find_active_chain()
+	if chain != null and chain.is_busy():
+		return
+	_lose_life()
 
 
 func _tick_survive_objective(delta: float) -> void:
@@ -838,8 +897,8 @@ func _emit_objective_progress() -> void:
 			ratio = 1.0 - clampf(float(shots_fired) / float(maxi(current_level_def.shot_limit, 1)), 0.0, 1.0)
 			label = "Shots left: %d" % left
 		LevelObjective.Kind.COMBO_TARGET:
-			ratio = clampf(float(peak_combo) / float(maxi(current_level_def.target_combo, 1)), 0.0, 1.0)
-			label = "Combo %d / %d" % [peak_combo, current_level_def.target_combo]
+			ratio = clampf(float(level_peak_combo) / float(maxi(current_level_def.target_combo, 1)), 0.0, 1.0)
+			label = "Combo %d / %d" % [level_peak_combo, current_level_def.target_combo]
 		LevelObjective.Kind.DEFEAT_BOSS:
 			label = "Defeat %s" % (
 				current_level_def.boss.display_name if current_level_def.boss else "the boss"

@@ -64,6 +64,7 @@ func _ready() -> void:
 	if _switch_btn:
 		_switch_btn.pressed.connect(_on_switch_player)
 	_adventure_btn.button_down.connect(func() -> void: UIFx.punch_button(_adventure_btn))
+	EventBus.settings_changed.connect(_start_menu_pulses)
 	EventBus.high_score_changed.connect(_on_high_score)
 	EventBus.game_state_changed.connect(_on_state)
 	EventBus.player_profile_changed.connect(_on_profile_changed)
@@ -73,11 +74,8 @@ func _ready() -> void:
 	_refresh_leaderboard()
 	_refresh_greeting()
 	_on_state(-1, int(GameManager.state))
-	if not SaveService.profile_setup_done:
-		_awaiting_instructions_after_profile = true
-		call_deferred("_prompt_new_user")
-	else:
-		call_deferred("_maybe_show_instructions")
+	# The first playable level teaches the controls. Player naming stays optional.
+	_quit_btn.visible = not OS.has_feature("web")
 
 
 func _style() -> void:
@@ -407,6 +405,11 @@ func _on_state(_prev: int, next: int) -> void:
 
 
 func _play_entrance() -> void:
+	if SaveService.reduced_fx:
+		for part: Control in [_brand, _leaderboard, _mascot, _cta]:
+			part.modulate.a = 1.0
+			part.scale = Vector2.ONE
+		return
 	_brand.modulate.a = 0.0
 	_brand.scale = Vector2(0.94, 0.94)
 	_brand.pivot_offset = Vector2(_brand.size.x * 0.5, 40.0)
@@ -441,7 +444,7 @@ func _start_menu_pulses() -> void:
 
 func _start_play_pulse() -> void:
 	_stop_play_pulse()
-	if not is_instance_valid(_adventure_btn) or not visible:
+	if SaveService.reduced_fx or not is_instance_valid(_adventure_btn) or not visible:
 		return
 	_adventure_btn.pivot_offset = _adventure_btn.size * 0.5
 	_play_pulse = create_tween()
@@ -461,7 +464,7 @@ func _stop_play_pulse() -> void:
 
 func _start_gauntlet_glow() -> void:
 	_stop_gauntlet_glow()
-	if not is_instance_valid(_gauntlet_btn) or not visible:
+	if SaveService.reduced_fx or not is_instance_valid(_gauntlet_btn) or not visible:
 		return
 	_gauntlet_glow = create_tween()
 	_gauntlet_glow.set_loops()

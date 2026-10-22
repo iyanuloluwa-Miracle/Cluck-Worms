@@ -57,6 +57,19 @@ var _slow_btn: Button
 var _bomb_btn: Button
 var _toast: Label
 var _toast_tween: Tween
+var _current_chip: PanelContainer
+var _current_label: Label
+var _current_swatch: Control
+var _current_kind: WormColor.Kind = WormColor.Kind.RED
+var _next_kind: WormColor.Kind = WormColor.Kind.RED
+var _swap_btn: Button
+var _guide_panel: PanelContainer
+var _guide_label: Label
+var _guide_skip: Button
+var _guide_active: bool = false
+var _guide_shot: bool = false
+var _guide_swapped: bool = false
+var _guide_matched: bool = false
 
 
 func _ready() -> void:
@@ -95,6 +108,11 @@ func _ready() -> void:
 	EventBus.achievement_unlocked.connect(_on_achievement)
 	EventBus.tutorial_step.connect(_on_tip)
 	_ensure_meta_hud()
+	_ensure_ammo_hud()
+	_ensure_field_guide()
+	EventBus.chicken_shot.connect(_on_guide_shot)
+	EventBus.chicken_swapped.connect(_on_guide_swap)
+	EventBus.chain_match_found.connect(_on_guide_match)
 	_on_combo(0)
 	if _gauntlet_banner:
 		_gauntlet_banner.visible = false
@@ -213,7 +231,7 @@ func _style_navbar(gauntlet: bool) -> void:
 	UITheme.apply_font(_next_label, UITheme.WEIGHT_BOLD)
 	_next_label.add_theme_font_size_override("font_size", 14)
 	_next_label.add_theme_color_override("font_color", gold if gauntlet else UITheme.CREAM_DIM)
-	_next_label.text = "NEXT"
+	_next_label.text = "NEXT\n%s" % WormColor.kind_name(_next_kind)
 
 
 func _on_state(_prev: int, next: int) -> void:
@@ -316,12 +334,10 @@ func _on_combo(combo: int) -> void:
 	UIFx.pulse_label(_combo)
 
 
-func _on_lives(lives: int, max_lives: int) -> void:
-	# Chicken icons for lives (Cluck & Worms twist on Zuma frogs).
-	var icons: String = ""
-	for i: int in range(max_lives):
-		icons += "🐔" if i < lives else "·"
-	_lives.text = icons
+func _on_lives(lives: int, _max_lives: int) -> void:
+	# Use supported text instead of platform-dependent emoji glyphs.
+	_lives.text = "LIVES %d" % lives
+	_lives_well.tooltip_text = "Lives remaining. Keep the chain away from the nest."
 
 
 func _ensure_meta_hud() -> void:
@@ -347,12 +363,14 @@ func _ensure_meta_hud() -> void:
 		_ability_row.mouse_filter = Control.MOUSE_FILTER_STOP
 		_ability_row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 		_ability_row.offset_left = 8.0
-		_ability_row.offset_top = -78.0
+		_ability_row.offset_top = -52.0
 		_ability_row.offset_right = 280.0
-		_ability_row.offset_bottom = -18.0
+		_ability_row.offset_bottom = 0.0
 		_ability_row.add_theme_constant_override("separation", 10)
 		_slow_btn = _make_ability_button("SLOW [Q]", Color(0.25, 0.55, 0.85))
 		_bomb_btn = _make_ability_button("BOMB [E]", Color(0.75, 0.28, 0.18))
+		_slow_btn.tooltip_text = "Slow the chain for 3 seconds. Costs one charge. [Q]"
+		_bomb_btn.tooltip_text = "Blast away a cluster of worms. Costs one charge. [E]"
 		_slow_btn.pressed.connect(func() -> void: GameManager.try_use_slow_ability())
 		_bomb_btn.pressed.connect(func() -> void: GameManager.try_use_bomb_ability())
 		_ability_row.add_child(_slow_btn)
@@ -380,7 +398,7 @@ func _ensure_meta_hud() -> void:
 func _make_ability_button(text: String, fill: Color) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(120, 48)
+	btn.custom_minimum_size = Vector2(124, 48)
 	# Q / E trigger abilities; focusable buttons would steal Space (swap) after a click.
 	btn.focus_mode = Control.FOCUS_NONE
 	var n := _inset(fill, 10, Color(1, 1, 1, 0.35))
@@ -505,7 +523,7 @@ func _set_boss_hud_visible(show_boss: bool) -> void:
 	if _boss_panel:
 		_boss_panel.visible = show_boss
 	if _objective_label:
-		_objective_label.visible = not show_boss
+		_objective_label.visible = not show_boss and not _guide_active
 
 
 func _on_boss_phase(_id: StringName, phase: int) -> void:
@@ -600,7 +618,8 @@ func _on_level_started(_id: StringName, _display_name: String) -> void:
 	_status.text = ""
 	_danger_urgency = 0.0
 	_update_progress_bar()
-	if not is_boss:
+	_begin_field_guide()
+	if not is_boss and not _guide_active:
 		_show_level_intro()
 
 
@@ -628,7 +647,7 @@ func _show_level_intro() -> void:
 	_intro_box.pivot_offset = _intro_box.size * 0.5
 	_intro_tween = _intro_box.create_tween()
 	_intro_tween.tween_property(_intro_box, "modulate:a", 1.0, 0.25)
-	_intro_tween.parallel().tween_property(_intro_box, "scale", Vector2.ONE, 0.35).from(Vector2(0.85, 0.85)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_intro_tween.parallel().tween_property(_intro_box, "scale", Vector2.ONE, 0.35).from(Vector2.ONE if SaveService.reduced_fx else Vector2(0.85, 0.85)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_intro_tween.tween_interval(hold)
 	_intro_tween.tween_property(_intro_box, "modulate:a", 0.0, 0.4)
 
@@ -692,7 +711,13 @@ func _update_progress_bar() -> void:
 	_progress_bar.value = clampf(ratio, 0.0, 1.0)
 
 
-func _on_loadout(_current: WormColor.Kind, next_color: WormColor.Kind) -> void:
+func _on_loadout(current: WormColor.Kind, next_color: WormColor.Kind) -> void:
+	_current_kind = current
+	_next_kind = next_color
+	_next_label.text = "NEXT\n%s" % WormColor.kind_name(next_color)
+	if _current_swatch:
+		_current_swatch.set_color_kind(current)
+		_current_label.text = "NOW\n%s" % WormColor.kind_name(current)
 	if _swatch and _swatch.has_method("set_color_kind"):
 		_swatch.set_color_kind(next_color)
 		UIFx.pulse_label(_next_chip)
@@ -755,3 +780,132 @@ func _on_pause() -> void:
 		GameManager.pause_game()
 	elif GameManager.state == GameManager.State.PAUSED:
 		GameManager.resume_game()
+
+
+func _ensure_ammo_hud() -> void:
+	var dock: HBoxContainer = $Root/Safe/BottomBar
+	dock.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	dock.offset_left = -458.0
+	dock.offset_right = -8.0
+	dock.offset_top = -52.0
+	dock.offset_bottom = 0.0
+	dock.add_theme_constant_override("separation", 8)
+	var margin: MarginContainer = _next_chip.get_node("Margin")
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 0)
+	margin.add_theme_constant_override("margin_bottom", 0)
+	_current_chip = _next_chip.duplicate() as PanelContainer
+	_current_chip.name = "CurrentChip"
+	dock.add_child(_current_chip)
+	dock.move_child(_current_chip, 0)
+	_current_label = _current_chip.get_node("Margin/Row/NextLabel")
+	_current_swatch = _current_chip.get_node("Margin/Row/WormSwatch")
+	_current_chip.add_theme_stylebox_override("panel", _inset(Color(0.20, 0.23, 0.09), 12, GOLD))
+	_current_label.text = "NOW\nRed"
+	_current_label.add_theme_color_override("font_color", GOLD)
+	_swap_btn = _make_ability_button("SWAP [SPACE]", Color(0.22, 0.32, 0.16))
+	_swap_btn.tooltip_text = "Exchange your current and next worm. Also right-click or tap with a second finger."
+	_swap_btn.pressed.connect(func() -> void: GameManager.try_swap_ammo())
+	dock.add_child(_swap_btn)
+	_status.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_status.offset_left = 292.0
+	_status.offset_right = 758.0
+	_status.offset_top = -48.0
+	_status.offset_bottom = -4.0
+	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status.add_theme_font_size_override("font_size", 15)
+
+
+func _ensure_field_guide() -> void:
+	_guide_panel = PanelContainer.new()
+	_guide_panel.name = "FieldGuide"
+	_guide_panel.visible = false
+	_guide_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_guide_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_guide_panel.offset_left = 8.0
+	_guide_panel.offset_right = -8.0
+	_guide_panel.offset_top = 74.0
+	_guide_panel.offset_bottom = 112.0
+	_guide_panel.add_theme_stylebox_override("panel", _inset(Color(0.08, 0.16, 0.10, 0.98), 10, Color(0.65, 0.59, 0.25)))
+	$Root/Safe.add_child(_guide_panel)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 14)
+	_guide_panel.add_child(row)
+	_guide_label = Label.new()
+	_guide_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_guide_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UITheme.apply_font(_guide_label, UITheme.WEIGHT_BOLD)
+	_guide_label.add_theme_font_size_override("font_size", 15)
+	_guide_label.add_theme_color_override("font_color", UITheme.CREAM)
+	row.add_child(_guide_label)
+	_guide_skip = Button.new()
+	_guide_skip.text = "SKIP"
+	_guide_skip.focus_mode = Control.FOCUS_NONE
+	_guide_skip.custom_minimum_size = Vector2(68, 30)
+	UITheme.apply_font(_guide_skip, UITheme.WEIGHT_BOLD)
+	_guide_skip.add_theme_font_size_override("font_size", 13)
+	_guide_skip.pressed.connect(_skip_field_guide)
+	row.add_child(_guide_skip)
+
+
+func _begin_field_guide() -> void:
+	_guide_active = not SaveService.field_guide_done and not GameManager.is_gauntlet_run and GameManager.challenge_mode == &"" and GameManager.stage_index == 0 and GameManager.level_index == 0
+	_guide_shot = false
+	_guide_swapped = false
+	_guide_matched = false
+	_guide_panel.visible = _guide_active
+	_guide_skip.visible = true
+	_objective_label.visible = not _boss_visible and not _guide_active
+	_combo.visible = not _guide_active
+	if _guide_active:
+		_refresh_field_guide()
+
+
+func _refresh_field_guide() -> void:
+	if not _guide_active:
+		return
+	if not _guide_shot:
+		_guide_label.text = "FIELD TRAINING  1 / 3     Aim at the chain and click to fire. On touch, tap where you want to shoot."
+	elif not _guide_swapped:
+		_guide_label.text = "FIELD TRAINING  2 / 3     Change your shot: press Space, right-click, or tap SWAP below."
+	elif not _guide_matched:
+		_guide_label.text = "FIELD TRAINING  3 / 3     Fire into a matching pair to make 3. The same symbols mark matching colors."
+	else:
+		_guide_active = false
+		SaveService.set_field_guide_done()
+		_guide_label.text = "TRAINING COMPLETE     Keep the nest safe! Q slows the chain. E blasts a cluster. Each uses one charge."
+		_guide_skip.visible = false
+		get_tree().create_timer(3.5, false).timeout.connect(func() -> void:
+			if not _guide_active:
+				_guide_panel.visible = false
+				_objective_label.visible = not _boss_visible
+				_combo.visible = true
+		)
+
+
+func _skip_field_guide() -> void:
+	_guide_active = false
+	SaveService.set_field_guide_done()
+	_guide_panel.visible = false
+	_objective_label.visible = not _boss_visible
+	_combo.visible = true
+
+
+func _on_guide_shot(_color: WormColor.Kind, _origin: Vector2, _direction: Vector2) -> void:
+	if _guide_active:
+		_guide_shot = true
+		_refresh_field_guide()
+
+
+func _on_guide_swap(_current: WormColor.Kind, _next: WormColor.Kind) -> void:
+	if _guide_active:
+		_guide_swapped = true
+		_refresh_field_guide()
+
+
+func _on_guide_match(_chain: WormChain, _start: int, _count: int, _color: WormColor.Kind) -> void:
+	if _guide_active:
+		_guide_matched = true
+		_refresh_field_guide()

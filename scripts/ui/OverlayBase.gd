@@ -39,7 +39,7 @@ func show_overlay() -> void:
 	modulate.a = 1.0
 	if _panel:
 		_panel.modulate.a = 0.0
-		_panel.scale = Vector2(0.88, 0.88)
+		_panel.scale = Vector2.ONE if SaveService.reduced_fx else Vector2(0.88, 0.88)
 		# Wait one frame so size/pivot are valid on first show.
 		await get_tree().process_frame
 		if not _showing:

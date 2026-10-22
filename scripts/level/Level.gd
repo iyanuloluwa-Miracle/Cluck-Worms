@@ -154,11 +154,23 @@ func _seed_initial_chain() -> void:
 
 
 func _on_reached_end(_chain: WormChain) -> void:
+	if _chain != chain_node:
+		return
 	if chicken_node:
 		chicken_node.set_shooting_enabled(false)
 
 
 func _on_cleared(_chain: WormChain) -> void:
+	if _chain != chain_node:
+		return
+	# Targets and survival must remain playable when their finite wave runs out.
+	if _level_data != null and not GameManager.objective_met and GameManager.state == GameManager.State.PLAYING:
+		if _level_data.objective in [LevelObjective.Kind.SCORE_TARGET, LevelObjective.Kind.COMBO_TARGET, LevelObjective.Kind.SURVIVE_TIME]:
+			chain_node.configure_spawn_budget(12)
+			chain_node.auto_spawn = true
+			chain_node.is_marching = true
+			chicken_node.set_shooting_enabled(true)
+			return
 	# On boss stages, a premature chain clear must not soft-lock — keep pressure up.
 	if _level_data != null and _level_data.is_boss_level:
 		if _boss == null or not _boss.is_defeated:

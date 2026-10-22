@@ -26,6 +26,8 @@ var _frame_queue: Array[StringName] = []
 var _frame_job: MusicComposer.Job
 ## Number of stage tracks whose composed version has replaced the fallback drone.
 var composed_tracks: int = 0
+var _danger: float = 0.0
+var _danger_beat_left: float = 0.0
 
 
 func _ready() -> void:
@@ -50,6 +52,8 @@ func _ready() -> void:
 		_start_music_composition()
 	_register_music_bank()
 
+	EventBus.danger_warning.connect(func(urgency: float) -> void: _danger = urgency)
+	EventBus.level_started.connect(func(_id: StringName, _title: String) -> void: _danger = 0.0)
 	EventBus.chicken_shot.connect(_on_chicken_shot)
 	EventBus.chicken_swapped.connect(_on_chicken_swapped)
 	EventBus.projectile_hit_chain.connect(_on_projectile_hit)
@@ -87,7 +91,8 @@ func play_sfx(logical_name: StringName, pitch_scale: float = 1.0, volume_offset_
 	player.stream = _streams[logical_name]
 	player.pitch_scale = pitch_scale
 	player.volume_db = volume_offset_db
-	player.play()
+	if DisplayServer.get_name() != "headless":
+		player.play()
 
 
 func play_music(logical_name: StringName, fade_in: bool = false) -> void:
@@ -101,7 +106,8 @@ func play_music(logical_name: StringName, fade_in: bool = false) -> void:
 	_kill_music_tween()
 	_current_music = logical_name
 	_music_player.stream = _streams[logical_name]
-	_music_player.play()
+	if DisplayServer.get_name() != "headless":
+		_music_player.play()
 	if fade_in:
 		_music_player.volume_db = -40.0
 		_music_tween = create_tween()
@@ -159,10 +165,10 @@ func _kill_music_tween() -> void:
 
 
 func _register_music_bank() -> void:
-	# Prefer raw load so music works before the editor has reimported the asset.
-	var menu: AudioStream = AudioStreamOggVorbis.load_from_file(MENU_MUSIC_PATH)
-	if menu == null and ResourceLoader.exists(MENU_MUSIC_PATH):
-		menu = load(MENU_MUSIC_PATH) as AudioStream
+	# Exported assets are imported resources; the original OGG is not in the PCK.
+	var menu: AudioStream = load(MENU_MUSIC_PATH) as AudioStream if ResourceLoader.exists(MENU_MUSIC_PATH) else null
+	if menu == null and FileAccess.file_exists(MENU_MUSIC_PATH):
+		menu = AudioStreamOggVorbis.load_from_file(MENU_MUSIC_PATH)
 	if menu == null:
 		push_warning("AudioManager: missing menu music at %s" % MENU_MUSIC_PATH)
 		return
@@ -216,6 +222,7 @@ func _on_achievement(_id: StringName) -> void:
 # ---------------------------------------------------------------------------
 
 func _build_procedural_bank() -> void:
+	_streams[&"danger"] = _arpeggio([164.8, 130.8], 0.065, 0.3)
 	_streams[&"peck"] = _tone_blip(880.0, 0.045, 0.45, true)
 	_streams[&"shoot"] = _tone_blip(620.0, 0.06, 0.4, true)
 	_streams[&"pop"] = _noise_burst(0.07, 0.55, 900.0)
@@ -323,6 +330,13 @@ func _start_music_composition() -> void:
 
 
 func _process(_delta: float) -> void:
+	if GameManager.can_player_act() and _danger > 0.18:
+		_danger_beat_left -= _delta
+		if _danger_beat_left <= 0.0:
+			play_sfx(&"danger", lerpf(0.9, 1.15, _danger), -5.0)
+			_danger_beat_left = lerpf(1.35, 0.38, _danger)
+	else:
+		_danger_beat_left = 0.0
 	if _frame_queue.is_empty():
 		return
 	if _frame_job == null:
@@ -347,6 +361,13 @@ func _on_track_composed(track: StringName, pcm: PackedByteArray) -> void:
 
 
 func _exit_tree() -> void:
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+		_music_player.stream = null
+	for player: AudioStreamPlayer in _sfx_players:
+		if is_instance_valid(player):
+			player.stop()
+			player.stream = null
 	if _compose_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_compose_task)
 		_compose_task = -1
@@ -365,8 +386,8 @@ func _loop_bed(freq: float, duration: float, amp: float) -> AudioStreamWAV:
 # ---------------------------------------------------------------------------
 
 func _on_chicken_shot(_color: WormColor.Kind, _o: Vector2, _d: Vector2) -> void:
-	play_sfx(&"peck", 1.0 + GameManager.get_rng().randf_range(-0.04, 0.06))
-	play_sfx(&"shoot", 1.0 + GameManager.get_rng().randf_range(-0.05, 0.08), -4.0)
+	play_sfx(&"peck", 1.0 + GameManager.get_fx_rng().randf_range(-0.04, 0.06))
+	play_sfx(&"shoot", 1.0 + GameManager.get_fx_rng().randf_range(-0.05, 0.08), -4.0)
 
 
 func _on_chicken_swapped(_c: WormColor.Kind, _n: WormColor.Kind) -> void:
@@ -375,7 +396,7 @@ func _on_chicken_swapped(_c: WormColor.Kind, _n: WormColor.Kind) -> void:
 
 
 func _on_projectile_hit(_p: ShootingWorm, _h: Worm, _c: WormChain) -> void:
-	play_sfx(&"impact", 1.0 + GameManager.get_rng().randf_range(-0.05, 0.05))
+	play_sfx(&"impact", 1.0 + GameManager.get_fx_rng().randf_range(-0.05, 0.05))
 
 
 func _on_cascade_step(_c: WormChain, depth: int, count: int, _color: WormColor.Kind) -> void:
@@ -400,7 +421,7 @@ func _on_boss_introduced(_id: StringName, _name: String) -> void:
 
 
 func _on_boss_damaged(_id: StringName, _amount: float, _pos: Vector2) -> void:
-	play_sfx(&"boss_hit", 1.0 + GameManager.get_rng().randf_range(-0.05, 0.08))
+	play_sfx(&"boss_hit", 1.0 + GameManager.get_fx_rng().randf_range(-0.05, 0.08))
 
 
 func _on_boss_defeated(_id: StringName) -> void:
@@ -440,7 +461,7 @@ func _on_good_shot(_p: Vector2, _count: int) -> void:
 func _on_chicken_react(reaction: StringName, _pos: Vector2) -> void:
 	match reaction:
 		&"celebrate":
-			play_sfx(&"happy_cluck", 1.0 + GameManager.get_rng().randf_range(0.0, 0.1))
+			play_sfx(&"happy_cluck", 1.0 + GameManager.get_fx_rng().randf_range(0.0, 0.1))
 		&"peck":
 			play_sfx(&"cluck", 1.05, -3.0)
 		&"sigh":

@@ -78,3 +78,23 @@ static func kind_name(kind: Kind) -> String:
 			return "Orange"
 		_:
 			return "Unknown"
+
+
+## A shared shape code for color-blind play: used on chain, ammo and HUD.
+## Symbols fit a 12 by 10 unit box at scale 1.
+static func draw_symbol(canvas: CanvasItem, center: Vector2, kind: Kind, s: float = 1.0, color: Color = Color(1, 1, 1, 0.85)) -> void:
+	match kind:
+		Kind.RED:
+			canvas.draw_line(center + Vector2(-4.5, 0) * s, center + Vector2(4.5, 0) * s, color, 2.6 * s, true)
+		Kind.BLUE:
+			canvas.draw_arc(center, 3.7 * s, 0, TAU, 16, color, 1.9 * s, true)
+		Kind.GREEN:
+			canvas.draw_polyline(PackedVector2Array([center + Vector2(-4.5, -2.5) * s, center + Vector2(0, 2.5) * s, center + Vector2(4.5, -2.5) * s]), color, 2.0 * s, true)
+		Kind.YELLOW:
+			for i: int in range(3):
+				canvas.draw_circle(center + Vector2(float(i - 1) * 4.2, 0) * s, 1.5 * s, color)
+		Kind.PURPLE:
+			canvas.draw_line(center + Vector2(-3.3, -3.3) * s, center + Vector2(3.3, 3.3) * s, color, 1.9 * s, true)
+			canvas.draw_line(center + Vector2(-3.3, 3.3) * s, center + Vector2(3.3, -3.3) * s, color, 1.9 * s, true)
+		Kind.ORANGE:
+			canvas.draw_arc(center + Vector2(0, -1.8) * s, 4.0 * s, 0.1, PI - 0.1, 12, color, 2.0 * s, true)

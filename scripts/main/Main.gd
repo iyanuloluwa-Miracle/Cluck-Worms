@@ -36,4 +36,5 @@ func _on_unload_level() -> void:
 
 func _clear_level_host() -> void:
 	for child: Node in _level_host.get_children():
+		_level_host.remove_child(child)
 		child.queue_free()

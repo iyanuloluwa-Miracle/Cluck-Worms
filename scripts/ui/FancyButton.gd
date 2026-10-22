@@ -22,12 +22,17 @@ func _update_pivot() -> void:
 
 
 func _on_down() -> void:
+	if SaveService.reduced_fx:
+		return
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "scale", Vector2(0.94, 0.94), 0.05)
 
 
 func _on_up() -> void:
+	if SaveService.reduced_fx:
+		scale = Vector2.ONE
+		return
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "scale", Vector2.ONE, 0.12)

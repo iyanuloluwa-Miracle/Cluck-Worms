@@ -19,6 +19,7 @@ var best_combo: int = 0
 var stages_cleared: int = 0
 var max_level_unlocked: int = 1 ## Campaign level number 1..N
 var tutorial_done: bool = false
+var field_guide_done: bool = false
 var reduced_shake: bool = false
 var reduced_fx: bool = false
 var master_volume: float = 1.0
@@ -68,7 +69,7 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if _stats_dirty:
 			save()
 
@@ -86,6 +87,7 @@ func load_save() -> void:
 	stages_cleared = _read_int(cfg, SECTION_PROGRESS, "stages_cleared", 0, 0, 1000)
 	max_level_unlocked = _read_int(cfg, SECTION_PROGRESS, "max_level_unlocked", 1, 1, 1000)
 	tutorial_done = _read_bool(cfg, SECTION_PROGRESS, "tutorial_done", false)
+	field_guide_done = _read_bool(cfg, SECTION_PROGRESS, "field_guide_done", false)
 	level_records = _sanitize_records(cfg.get_value(SECTION_LEVELS, "records", {}))
 	achievements = _sanitize_flags(cfg.get_value(SECTION_ACHIEVEMENTS, "flags", {}))
 	reduced_shake = _read_bool(cfg, SECTION_SETTINGS, "reduced_shake", false)
@@ -198,6 +200,7 @@ func _reset_defaults() -> void:
 	stages_cleared = 0
 	max_level_unlocked = 1
 	tutorial_done = false
+	field_guide_done = false
 	current_player_name = "Farmer Cluck"
 	profiles = ["Farmer Cluck"]
 	profile_setup_done = false
@@ -213,7 +216,6 @@ func _reset_defaults() -> void:
 
 
 func save() -> void:
-	_stats_dirty = false
 	var cfg := ConfigFile.new()
 	cfg.set_value(SECTION_PROGRESS, "save_version", SAVE_VERSION)
 	cfg.set_value(SECTION_PROGRESS, "high_score", high_score)
@@ -221,6 +223,7 @@ func save() -> void:
 	cfg.set_value(SECTION_PROGRESS, "stages_cleared", stages_cleared)
 	cfg.set_value(SECTION_PROGRESS, "max_level_unlocked", max_level_unlocked)
 	cfg.set_value(SECTION_PROGRESS, "tutorial_done", tutorial_done)
+	cfg.set_value(SECTION_PROGRESS, "field_guide_done", field_guide_done)
 	cfg.set_value(SECTION_PROGRESS, "player_name", current_player_name)
 	cfg.set_value(SECTION_PROGRESS, "profiles", profiles)
 	cfg.set_value(SECTION_PROGRESS, "profile_setup_done", profile_setup_done)
@@ -240,6 +243,8 @@ func save() -> void:
 	cfg.set_value(SECTION_SETTINGS, "music_volume", music_volume)
 	cfg.set_value(SECTION_SETTINGS, "mute_all", mute_all)
 	var err: Error = cfg.save(save_path)
+	_stats_dirty = err != OK
+	_stats_flush_timer = STATS_FLUSH_INTERVAL
 	if err != OK:
 		push_warning("SaveService: could not write %s (error %d)" % [save_path, err])
 
@@ -406,6 +411,11 @@ func unlock_achievement(id: StringName) -> bool:
 
 func has_achievement(id: StringName) -> bool:
 	return bool(achievements.get(String(id), false))
+
+
+func set_field_guide_done(done: bool = true) -> void:
+	field_guide_done = done
+	save()
 
 
 func set_tutorial_done(done: bool = true) -> void:

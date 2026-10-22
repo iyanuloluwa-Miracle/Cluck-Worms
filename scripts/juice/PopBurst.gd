@@ -15,7 +15,7 @@ var _intensity: float = 1.0
 func setup(color: Color, intensity: float = 1.0) -> void:
 	_base_color = color
 	_intensity = clampf(intensity, 0.35, 2.5)
-	var rng := GameManager.get_rng()
+	var rng := GameManager.get_fx_rng()
 	var shard_budget: float = float(SHARD_COUNT) * _intensity
 	if QualitySettings.is_low():
 		shard_budget = minf(shard_budget, 8.0)
@@ -57,7 +57,7 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 	for bit: Dictionary in _bits:
-		bit["vel"] = bit["vel"] * (1.0 - delta * 2.8) + Vector2(0, 420.0 * delta)
+		bit["vel"] = bit["vel"] * exp(-delta * 2.8) + Vector2(0, 420.0 * delta)
 		bit["pos"] = bit["pos"] + bit["vel"] * delta
 		bit["rot"] = float(bit["rot"]) + float(bit["spin"]) * delta
 	modulate.a = 1.0 - t * t

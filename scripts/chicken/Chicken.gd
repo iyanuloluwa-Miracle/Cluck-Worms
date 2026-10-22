@@ -64,9 +64,6 @@ extends Node2D
 ## Radius around the chicken that counts as a "swap tap" on touch.
 @export var swap_tap_radius: float = 70.0
 
-## Double-tap window for touch swap (seconds).
-@export var double_tap_window: float = 0.28
-
 # ---------------------------------------------------------------------------
 # Loadout
 # ---------------------------------------------------------------------------
@@ -93,8 +90,9 @@ var _blink_left: float = 0.0
 var _is_blinking: bool = false
 
 var _touch_ids: Dictionary = {}  # finger_id -> position
-var _last_tap_time: float = -10.0
+var _using_touch: bool = false
 var _active_aim_finger: int = -1
+var _born_on_frame: int = -1
 
 ## Personality / reaction state for body drawing.
 var reaction: StringName = &""
@@ -114,9 +112,10 @@ var _projectile_container: Node
 
 
 func _ready() -> void:
+	_born_on_frame = Engine.get_process_frames()
 	resolve_level_bindings()
 	_roll_initial_loadout()
-	_blink_timer = GameManager.get_rng().randf_range(blink_interval_min, blink_interval_max)
+	_blink_timer = GameManager.get_fx_rng().randf_range(blink_interval_min, blink_interval_max)
 	_pointer_pos = get_global_mouse_position()
 	_has_pointer = true
 	_target_angle = (_pointer_pos - global_position).angle()
@@ -127,7 +126,7 @@ func _ready() -> void:
 	EventBus.chicken_loadout_changed.emit(current_color, next_color)
 	EventBus.chicken_react.connect(_on_react)
 	EventBus.chain_worms_removed.connect(_on_chain_worms_removed)
-	_idle_peck_timer = GameManager.get_rng().randf_range(2.5, 5.0)
+	_idle_peck_timer = GameManager.get_fx_rng().randf_range(2.5, 5.0)
 
 
 func _process(delta: float) -> void:
@@ -147,42 +146,55 @@ func _process(delta: float) -> void:
 	_apply_body_transform()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_clear_touch_state()
+
+
+func _input(event: InputEvent) -> void:
+	# Releases must be observed even when a finger lifts over a HUD button.
+	if event is InputEventScreenTouch and (not event.pressed or event.canceled):
+		_release_touch(event.index)
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	# A touch can create this level through its emulated mouse event, then
+	# continue dispatching the original press. That menu tap is not a shot.
+	if Engine.get_process_frames() == _born_on_frame:
+		return
 	if not GameManager.can_player_act() or not _can_shoot:
 		return
 
-	# Keep pointer fresh (mouse). Touch positions update in _handle_touch / drag.
-	if event is InputEventMouseMotion:
-		_pointer_pos = get_global_mouse_position()
-		_has_pointer = true
-
-	# Actions cover LMB/RMB + Space (see project.godot). Avoid double-handling buttons.
-	if event.is_action_pressed("swap_worm"):
-		_pointer_pos = get_global_mouse_position()
-		_has_pointer = true
-		swap_worms()
-		get_viewport().set_input_as_handled()
-		return
-
-	if event.is_action_pressed("shoot"):
-		_pointer_pos = get_global_mouse_position()
-		_has_pointer = true
-		_try_shoot()
-		get_viewport().set_input_as_handled()
-		return
-
-	# --- Touch (mobile) ---
 	if event is InputEventScreenTouch:
 		_handle_touch(event as InputEventScreenTouch)
 		return
-
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
+		if not _touch_ids.has(drag.index):
+			return
 		_touch_ids[drag.index] = drag.position
-		if drag.index == _active_aim_finger or _active_aim_finger == -1:
+		if drag.index == _active_aim_finger:
 			_pointer_pos = _screen_to_world(drag.position)
 			_has_pointer = true
-			_active_aim_finger = drag.index
+		get_viewport().set_input_as_handled()
+		return
+
+	if event is InputEventMouse:
+		# Godot synthesizes mouse events from touch with device -1. Handling
+		# those again would fire a second shot or overwrite the touch aim.
+		if event.device == -1:
+			return
+		_using_touch = false
+		_pointer_pos = _screen_to_world(event.position)
+		_has_pointer = true
+
+	if event.is_action_pressed("swap_worm"):
+		swap_worms()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("shoot"):
+		_try_shoot()
+		get_viewport().set_input_as_handled()
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +213,8 @@ func swap_worms() -> void:
 
 func set_shooting_enabled(enabled: bool) -> void:
 	_can_shoot = enabled
+	if not enabled:
+		_clear_touch_state()
 
 
 func get_muzzle_global_position() -> Vector2:
@@ -218,8 +232,9 @@ func _update_pointer_from_devices() -> void:
 			_pointer_pos = _screen_to_world(_touch_ids[_active_aim_finger])
 			_has_pointer = true
 		return
-	_pointer_pos = get_global_mouse_position()
-	_has_pointer = true
+	if not _using_touch:
+		_pointer_pos = get_global_mouse_position()
+		_has_pointer = true
 
 
 func _update_aim(delta: float) -> void:
@@ -274,11 +289,15 @@ func _update_aim_line() -> void:
 # ---------------------------------------------------------------------------
 
 func _try_shoot() -> void:
-	if not _can_shoot or _cooldown_left > 0.0:
+	if not _can_shoot or _cooldown_left > 0.0 or not GameManager.can_fire_projectile():
 		return
 	if shooting_worm_scene == null:
 		return
 
+	# Animation may ease toward the cursor; a shot must always honor the
+	# latest click/tap, including an instant turn between rendered frames.
+	if _has_pointer and _pointer_pos.distance_squared_to(global_position) >= 4.0:
+		aim_at(_pointer_pos)
 	_cooldown_left = fire_cooldown
 
 	var dir: Vector2 = Vector2.from_angle(_aim_angle)
@@ -394,13 +413,13 @@ func _update_idle(delta: float) -> void:
 		_blink_left -= delta
 		if _blink_left <= 0.0:
 			_is_blinking = false
-			_blink_timer = GameManager.get_rng().randf_range(blink_interval_min, blink_interval_max)
+			_blink_timer = GameManager.get_fx_rng().randf_range(blink_interval_min, blink_interval_max)
 
 	# Occasional idle peck for personality.
 	_idle_peck_timer -= delta
 	if _idle_peck_timer <= 0.0 and reaction == &"":
 		_play_reaction(&"idle_peck", 0.22)
-		_idle_peck_timer = GameManager.get_rng().randf_range(3.0, 6.5)
+		_idle_peck_timer = GameManager.get_fx_rng().randf_range(3.0, 6.5)
 
 
 func _update_reaction(delta: float) -> void:
@@ -458,49 +477,44 @@ func is_celebrating() -> bool:
 # ---------------------------------------------------------------------------
 
 func _handle_touch(event: InputEventScreenTouch) -> void:
-	var screen_pos: Vector2 = event.position
-	var world_pos: Vector2 = _screen_to_world(screen_pos)
+	_using_touch = true
+	if not event.pressed or event.canceled:
+		_release_touch(event.index)
+		return
+	var world_pos: Vector2 = _screen_to_world(event.position)
+	_touch_ids[event.index] = event.position
 
-	if event.pressed:
-		_touch_ids[event.index] = screen_pos
-
-		# Two-finger tap → swap.
-		if _touch_ids.size() >= 2:
-			swap_worms()
-			get_viewport().set_input_as_handled()
-			return
-
-		# Tap on chicken / next-preview hotspot → swap (or double-tap swap).
-		var on_chicken: bool = global_position.distance_to(world_pos) <= swap_tap_radius
-		var on_next: bool = _next_preview.global_position.distance_to(world_pos) <= 48.0
-		var now: float = Time.get_ticks_msec() / 1000.0
-		if on_chicken or on_next:
-			if now - _last_tap_time <= double_tap_window:
-				swap_worms()
-				_last_tap_time = -10.0
-			else:
-				# Single tap on chicken aims; second quick tap swaps.
-				_last_tap_time = now
-				_pointer_pos = world_pos
-				_has_pointer = true
-				_active_aim_finger = event.index
-			get_viewport().set_input_as_handled()
-			return
-
-		# Aim + shoot toward tap (classic mobile marble-shooter).
-		_pointer_pos = world_pos
-		_has_pointer = true
-		_active_aim_finger = event.index
-		_target_angle = (world_pos - global_position).angle()
-		# Partial snap so the shot isn't stale-aimed, without hard-cutting feel.
-		_aim_angle = lerp_angle(_aim_angle, _target_angle, 0.85)
-		_aim_pivot.rotation = _aim_angle
-		_try_shoot()
+	# A second finger swaps without disturbing the first finger's aim.
+	if _touch_ids.size() == 2:
+		swap_worms()
 		get_viewport().set_input_as_handled()
-	else:
-		_touch_ids.erase(event.index)
-		if event.index == _active_aim_finger:
-			_active_aim_finger = -1
+		return
+	if _touch_ids.size() > 2:
+		get_viewport().set_input_as_handled()
+		return
+
+	var on_chicken: bool = global_position.distance_to(world_pos) <= swap_tap_radius
+	var on_next: bool = is_instance_valid(_next_preview) and _next_preview.global_position.distance_to(world_pos) <= 48.0
+	if on_chicken or on_next:
+		swap_worms()
+		get_viewport().set_input_as_handled()
+		return
+
+	_active_aim_finger = event.index
+	aim_at(world_pos)
+	_try_shoot()
+	get_viewport().set_input_as_handled()
+
+
+func _release_touch(index: int) -> void:
+	_touch_ids.erase(index)
+	if index == _active_aim_finger:
+		_active_aim_finger = -1
+
+
+func _clear_touch_state() -> void:
+	_touch_ids.clear()
+	_active_aim_finger = -1
 
 
 func _screen_to_world(screen_pos: Vector2) -> Vector2:

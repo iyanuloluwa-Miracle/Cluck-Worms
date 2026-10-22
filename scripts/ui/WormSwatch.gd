@@ -27,3 +27,5 @@ func _draw() -> void:
 	draw_circle(c + Vector2(10, -3), 3, WormColor.get_highlight(worm_color))
 	draw_circle(c + Vector2(11, -1), 2, Color.WHITE)
 	draw_circle(c + Vector2(12, -1), 1, Color(0.1, 0.1, 0.1))
+
+	WormColor.draw_symbol(self, c + Vector2(-4, 1), worm_color, 0.85)

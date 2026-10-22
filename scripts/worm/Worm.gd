@@ -1,8 +1,8 @@
-class_name Worm
+﻿class_name Worm
 extends Node2D
 ## A single colored worm segment on the playfield.
 ## [member path_distance] is the displayed position; [member target_path_distance]
-## is the logical slot. The chain lerps display → target for glitch-free motion.
+## is the logical slot. The chain lerps display â†’ target for glitch-free motion.
 
 # ---------------------------------------------------------------------------
 # States
@@ -91,16 +91,49 @@ var _match_flash: float = 0.0
 var _anim_time: float = 0.0
 ## Badge pulse for specials.
 var _badge_pulse: float = 0.0
+## One shared, supersampled body sheet keeps a long chain cheap to render.
+## Special badges stay live; movement, collisions and matching remain on Worm.
+const ATLAS_CELL := Vector2i(144, 96)
+const BODY_RECT := Rect2(-36, -24, 72, 48)
+static var _body_atlas: SubViewport
+var _atlas_source: bool = false
+
+
+func _ensure_body_atlas() -> void:
+	if _atlas_source or DisplayServer.get_name() == "headless" or is_instance_valid(_body_atlas):
+		return
+	_body_atlas = SubViewport.new()
+	_body_atlas.name = "SharedWormArtwork"
+	_body_atlas.size = Vector2i(ATLAS_CELL.x * WormColor.KIND_COUNT, ATLAS_CELL.y)
+	_body_atlas.disable_3d = true
+	_body_atlas.transparent_bg = true
+	_body_atlas.render_target_update_mode = SubViewport.UPDATE_ONCE
+	# The cache lives with the scene root, independent of pooled worms/levels.
+	get_tree().root.add_child.call_deferred(_body_atlas)
+	for i: int in range(WormColor.KIND_COUNT):
+		var painter := Worm.new()
+		painter._atlas_source = true
+		painter.worm_color = i as WormColor.Kind
+		painter.state = State.MOVING
+		painter.position = Vector2(float(i * ATLAS_CELL.x) + 72.0, 48.0)
+		painter.scale = Vector2(2, 2)
+		_body_atlas.add_child(painter)
 
 
 func _ready() -> void:
+	if _atlas_source:
+		set_process(false)
+	else:
+		_ensure_body_atlas()
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	z_as_relative = true
 	z_index = 0
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
-	_anim_time += delta
+	if not SaveService.reduced_fx:
+		_anim_time += delta
 	match state:
 		State.SPAWNING:
 			_process_spawning(delta)
@@ -174,8 +207,8 @@ func begin_fall() -> void:
 		global_rotation = world_rot
 	state = State.FALLING
 	_fall_velocity = Vector2(
-		GameManager.get_rng().randf_range(-FALL_DRIFT_RANGE, FALL_DRIFT_RANGE),
-		GameManager.get_rng().randf_range(-160.0, -30.0)
+		GameManager.get_fx_rng().randf_range(-FALL_DRIFT_RANGE, FALL_DRIFT_RANGE),
+		GameManager.get_fx_rng().randf_range(-160.0, -30.0)
 	)
 	_fall_timer = 0.0
 	owning_chain = null
@@ -303,142 +336,69 @@ func _process_falling(delta: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Drawing — upgraded premium worm visuals
+# Drawing â€” upgraded premium worm visuals
 # ---------------------------------------------------------------------------
 
 func _draw() -> void:
 	if state == State.POOLED or state == State.DEAD:
 		return
-	_draw_worm_body()
+	if not _atlas_source and is_instance_valid(_body_atlas):
+		var region := Rect2(Vector2(float(int(worm_color) * ATLAS_CELL.x), 0), Vector2(ATLAS_CELL))
+		draw_texture_rect_region(_body_atlas.get_texture(), BODY_RECT, region)
+		_draw_special_badge(BODY_LENGTH * 0.39)
+	else:
+		_draw_worm_body()
 
 
 func _draw_worm_body() -> void:
 	var fill: Color = WormColor.get_fill(worm_color)
-	var outline: Color = WormColor.get_outline(worm_color)
+	var outline: Color = WormColor.get_outline(worm_color).darkened(0.20)
 	var highlight: Color = WormColor.get_highlight(worm_color)
-	var half_len: float = BODY_LENGTH * 0.5
+	# Slightly shorter silhouettes preserve the space between curved neighbors.
+	# Collision and logical spacing are intentionally independent of artwork.
+	var half_len: float = BODY_LENGTH * 0.39
+	var shadow := Color(0.02, 0.05, 0.03, 0.35)
+	draw_line(Vector2(-half_len, 4), Vector2(half_len, 4), shadow, BODY_HALF_WIDTH * 2.0 + 4.0, true)
+	draw_circle(Vector2(half_len + 1, 4), HEAD_RADIUS + 2.0, shadow)
+	_draw_capsule(half_len, BODY_HALF_WIDTH + 2.1, outline)
+	draw_circle(Vector2(-half_len, 0), TAIL_RADIUS + 1.8, outline)
+	draw_circle(Vector2(half_len, 0), HEAD_RADIUS + 2.0, outline)
+	_draw_capsule(half_len, BODY_HALF_WIDTH, fill.darkened(0.13))
+	draw_circle(Vector2(-half_len, 0), TAIL_RADIUS, fill)
+	draw_circle(Vector2(half_len, 0), HEAD_RADIUS, fill)
+	_draw_capsule(half_len - 1.0, BODY_HALF_WIDTH - 2.5, fill)
 
-	# --- Drop shadow ---
-	draw_circle(Vector2(half_len + 1.0, 2.5), HEAD_RADIUS + 1.5, Color(0, 0, 0, 0.18))
-	draw_circle(Vector2(-half_len + 1.0, 2.5), TAIL_RADIUS + 1.0, Color(0, 0, 0, 0.14))
-	_draw_capsule_shadow(half_len, 1.5)
+	# A broad soft dorsal highlight and thin curved segment seams give a
+	# pearlescent organic body, with no hard rectangular chrome strips.
+	draw_line(Vector2(-half_len + 3, -3.8), Vector2(half_len - 7, -3.8), Color(highlight.r, highlight.g, highlight.b, 0.48), 4.0, true)
+	draw_circle(Vector2(-half_len + 2, -2.5), 2.5, Color(highlight.r, highlight.g, highlight.b, 0.40))
+	for x: float in [-9.0, 0.0, 8.0]:
+		draw_arc(Vector2(x + 8.0, 0), 9.5, 2.36, 3.92, 10, Color(outline.r, outline.g, outline.b, 0.25), 1.1, true)
+	draw_arc(Vector2(half_len, -0.5), HEAD_RADIUS - 2.6, 3.6, 4.8, 12, Color(highlight.r, highlight.g, highlight.b, 0.75), 2.0, true)
+	draw_circle(Vector2(half_len - 4, -7), 1.7, Color(1, 1, 0.94, 0.67))
 
-	# --- Outer outline (thicker for crisp readability) ---
-	_draw_capsule(half_len, BODY_HALF_WIDTH + OUTLINE_WIDTH + 0.5, outline)
-	_draw_circle_local(Vector2(half_len, 0.0), HEAD_RADIUS + OUTLINE_WIDTH + 0.5, outline)
-	_draw_circle_local(Vector2(-half_len, 0.0), TAIL_RADIUS + OUTLINE_WIDTH * 0.5, outline)
-
-	# --- Primary fill ---
-	_draw_capsule(half_len, BODY_HALF_WIDTH, fill)
-	_draw_circle_local(Vector2(half_len, 0.0), HEAD_RADIUS, fill)
-	_draw_circle_local(Vector2(-half_len, 0.0), TAIL_RADIUS, fill)
-
-	# --- Inner body gradient / shading ---
-	# Top highlight band — makes worm feel 3D / spherical.
-	var top_shine: Color = fill.lightened(0.30)
-	top_shine.a = 0.55
-	draw_line(
-		Vector2(-half_len + 4.0, -BODY_HALF_WIDTH * 0.55),
-		Vector2(half_len - 5.0, -BODY_HALF_WIDTH * 0.55),
-		top_shine,
-		BODY_HALF_WIDTH * 0.42,
-		true
-	)
-
-	# Belly gradient — slightly lighter, oval-shaped.
-	var belly: Color = fill.lightened(0.18)
-	belly.a = 0.48
-	draw_line(
-		Vector2(-half_len + 3.0, BODY_HALF_WIDTH * 0.30),
-		Vector2(half_len - 4.0, BODY_HALF_WIDTH * 0.30),
-		belly,
-		BODY_HALF_WIDTH * 0.48,
-		true
-	)
-
-	# --- Head specular highlight ---
-	_draw_circle_local(Vector2(half_len + 1.5, -3.5), HEAD_RADIUS * 0.40, Color(1, 1, 1, 0.60))
-	_draw_circle_local(Vector2(half_len + 3.0, -5.5), HEAD_RADIUS * 0.18, Color(1, 1, 1, 0.75))
-
-	# --- Accessibility pattern (larger, more readable) ---
 	_draw_color_pattern(half_len, outline)
-
-	# --- Eyes (expressive, front-facing) ---
-	var eye_y: float = -3.8
-	var eye_x: float = half_len + 2.0
-	# Eye whites with outline.
-	_draw_circle_local(Vector2(eye_x, eye_y - 3.2), EYE_RADIUS + 1.0, outline)
-	_draw_circle_local(Vector2(eye_x, eye_y + 3.2), EYE_RADIUS + 1.0, outline)
-	_draw_circle_local(Vector2(eye_x, eye_y - 3.2), EYE_RADIUS, Color.WHITE)
-	_draw_circle_local(Vector2(eye_x, eye_y + 3.2), EYE_RADIUS, Color.WHITE)
-	# Pupils.
-	_draw_circle_local(Vector2(eye_x + 1.4, eye_y - 3.2), PUPIL_RADIUS, Color(0.08, 0.08, 0.08))
-	_draw_circle_local(Vector2(eye_x + 1.4, eye_y + 3.2), PUPIL_RADIUS, Color(0.08, 0.08, 0.08))
-	# Eye shine.
-	_draw_circle_local(Vector2(eye_x + 0.5, eye_y - 4.0), 0.9, Color(1, 1, 1, 0.9))
-	_draw_circle_local(Vector2(eye_x + 0.5, eye_y + 2.4), 0.9, Color(1, 1, 1, 0.9))
-
-	# --- Smile arc ---
-	draw_arc(
-		Vector2(half_len + 7.0, 2.5),
-		4.5,
-		deg_to_rad(15.0),
-		deg_to_rad(165.0),
-		10,
-		outline,
-		1.6,
-		true
-	)
-
-	# --- Special worm badge ---
+	# Diagonal eye placement keeps both pupils distinct even at small sizes.
+	for eye: Vector2 in [Vector2(half_len + 2, -5.5), Vector2(half_len + 7, 0.8)]:
+		draw_circle(eye, 3.8, outline)
+		draw_circle(eye, 2.9, Color("fffef0"))
+		draw_circle(eye + Vector2(1.1, -0.1), 1.45, Color("25382c"))
+		draw_circle(eye + Vector2(0.6, -0.8), 0.65, Color.WHITE)
+	draw_arc(Vector2(half_len + 4, 5), 3.0, 0.2, 2.6, 10, outline, 1.1, true)
+	draw_circle(Vector2(half_len - 1, 3.5), 2.1, Color(highlight.r, highlight.g, highlight.b, 0.65))
 	_draw_special_badge(half_len)
 
 
-func _draw_capsule_shadow(half_len: float, offset: float) -> void:
-	## Subtle elliptical shadow behind the body.
-	var shadow: Color = Color(0, 0, 0, 0.15)
-	draw_line(
-		Vector2(-half_len + 2.0, BODY_HALF_WIDTH * 0.5 + offset),
-		Vector2(half_len - 2.0, BODY_HALF_WIDTH * 0.5 + offset),
-		shadow,
-		BODY_HALF_WIDTH * 0.7,
-		true
-	)
-
-
-func _draw_color_pattern(half_len: float, outline: Color) -> void:
-	## Per-color accessibility mark — larger and more distinct than before.
-	var mark := Color(outline.r, outline.g, outline.b, 0.7)
-	match worm_color:
-		WormColor.Kind.RED:
-			# Bold horizontal stripe.
-			draw_line(Vector2(-half_len * 0.45, -5.5), Vector2(half_len * 0.45, -5.5), mark, 2.5, true)
-		WormColor.Kind.BLUE:
-			# Centered circle dot.
-			draw_circle(Vector2(0, -1.5), 3.2, mark)
-		WormColor.Kind.GREEN:
-			# Double tick marks.
-			draw_line(Vector2(-8, 5.5), Vector2(-2, 5.5), mark, 2.2, true)
-			draw_line(Vector2(2, 5.5), Vector2(8, 5.5), mark, 2.2, true)
-		WormColor.Kind.YELLOW:
-			# Three dots in a row.
-			for i: int in range(3):
-				draw_circle(Vector2(-8.0 + float(i) * 8.0, -5.5), 2.0, mark)
-		WormColor.Kind.PURPLE:
-			# Diagonal cross stroke.
-			draw_line(Vector2(-9, -5), Vector2(9, 5), mark, 2.0, true)
-			draw_line(Vector2(9, -5), Vector2(-9, 5), mark, 1.2, true)
-		WormColor.Kind.ORANGE:
-			# Arc / wave.
-			draw_arc(Vector2(0, 1.5), 6.0, 0.3, PI - 0.3, 8, mark, 2.0, true)
-
+func _draw_color_pattern(_half_len: float, outline: Color) -> void:
+	var mark := Color(outline.r, outline.g, outline.b, 0.88)
+	WormColor.draw_symbol(self, Vector2(-4.5, 1.3), worm_color, 0.78, mark)
 
 func _draw_special_badge(half_len: float) -> void:
 	var bp: float = _badge_pulse
 	var badge_pos: Vector2 = Vector2(half_len - 2.0, -HEAD_RADIUS + 1.5)
 	match worm_type:
 		WormType.Kind.RAINBOW:
-			# Bright rainbow circle — rotates through hues.
+			# Bright rainbow circle â€” rotates through hues.
 			var ring_radius: float = 5.5 + bp * 0.8
 			draw_circle(badge_pos, ring_radius + 1.5, Color(0.08, 0.05, 0.12))
 			draw_arc(badge_pos, ring_radius, 0.0, TAU, 12, Color(1.0, 0.3, 0.9), 2.5, true)
@@ -475,7 +435,7 @@ func _draw_special_badge(half_len: float) -> void:
 
 
 func _draw_capsule(half_len: float, half_width: float, color: Color) -> void:
-	## Smooth capsule shape — tapers at the tail end for a worm silhouette.
+	## Smooth capsule shape â€” tapers at the tail end for a worm silhouette.
 	var points := PackedVector2Array()
 	var segments: int = 14
 	for i: int in range(segments + 1):

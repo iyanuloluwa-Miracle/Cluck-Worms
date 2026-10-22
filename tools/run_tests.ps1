@@ -1,37 +1,39 @@
-# Runs every automated Cluck & Worms suite headlessly.
-# Usage:  $env:GODOT = "C:\path\to\Godot_v4.7.2-stable_win64_console.exe"; .\tools\run_tests.ps1
-param([string]$Godot = $env:GODOT)
 
-if (-not $Godot -or -not (Test-Path $Godot)) {
-    Write-Error "Set `$env:GODOT (or pass -Godot) to a Godot 4.7 console executable."
+# Run the game-rule, lifecycle, tutorial, natural-play and audio checks.
+param([string]$Godot = $env:GODOT)
+if (-not $Godot -or -not (Test-Path -LiteralPath $Godot)) {
+    Write-Error "Pass -Godot with the path to the Godot 4.7 console executable."
     exit 2
 }
-
-$root = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$logRoot = Join-Path $projectRoot 'docs\test-results'
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+$importLog = & $Godot --headless --path $projectRoot --import 2>&1 | Out-String -Width 400
+$importExit = $LASTEXITCODE
+$importLog | Set-Content -LiteralPath (Join-Path $logRoot 'import.log') -Encoding UTF8
+if ($importExit -ne 0 -or $importLog -match 'SCRIPT ERROR|Parse Error') {
+    Write-Host $importLog
+    exit 1
+}
 $suites = @(
-    "res://tests/TestRunner.tscn",
-    "res://tests/ChainTestRunner.tscn",
-    "res://tests/GameFlowTestRunner.tscn",
-    "res://tests/SmokeTestRunner.tscn"
+    @{Name='core'; Args=@('res://tests/TestRunner.tscn')},
+    @{Name='chain'; Args=@('res://tests/ChainTestRunner.tscn')},
+    @{Name='flow'; Args=@('res://tests/GameFlowTestRunner.tscn')},
+    @{Name='scenes'; Args=@('res://tests/SmokeTestRunner.tscn')},
+    @{Name='guide'; Args=@('res://tests/GuideTestRunner.tscn')},
+    @{Name='arcade-session'; Args=@('res://tests/ArcadeSessionTestRunner.tscn')},
+    @{Name='meta'; Args=@('--script','res://tests/run_meta_tests.gd')},
+    @{Name='music'; Args=@('--script','res://tests/bench_music.gd')}
 )
 $failed = 0
-
-& $Godot --headless --path $root --import 2>&1 | Out-Null
-
 foreach ($suite in $suites) {
-    Write-Host "=== $suite" -ForegroundColor Cyan
-    $out = & $Godot --headless --path $root $suite 2>&1 | Out-String -Width 400
-    $lines = $out -split "`r?`n" | Where-Object { $_ -match "OK |FAIL|PASSED|FAILED|ERROR|SCRIPT" -and $_ -notmatch "^\s*at:|CategoryInfo|FullyQualified|^\+" }
-    $lines | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0 -or $out -match "FAIL|SCRIPT ERROR|Parse Error") { $failed++ }
+    $suiteArgs = $suite.Args
+    $output = & $Godot --headless --path $projectRoot @suiteArgs 2>&1 | Out-String -Width 400
+    $suiteExit = $LASTEXITCODE
+    $output | Set-Content -LiteralPath (Join-Path $logRoot ($suite.Name + '.log')) -Encoding UTF8
+    $output -split "`r?`n" | Where-Object { $_ -match 'OK |FAIL|PASSED|FAILED|ERROR|SESSION' -and $_ -notmatch '^\s*at:|CategoryInfo|FullyQualified|^\+' } | ForEach-Object { Write-Host $_ }
+    if ($suiteExit -ne 0 -or $output -match '(?m)^\s*FAIL\b|SCRIPT ERROR|Parse Error|ERROR:|\btests: \d+ FAILED\b|SMOKE TEST FAILED') { $failed++ }
+    Write-Host ($suite.Name + ': exit ' + $suiteExit)
 }
-
-foreach ($script in "res://tests/run_meta_tests.gd", "res://tests/bench_music.gd") {
-    Write-Host "=== $script" -ForegroundColor Cyan
-    & $Godot --headless --path $root --script $script 2>&1 | Out-String -Width 400 -Stream |
-        Select-String "OK |FAIL|PASSED" | ForEach-Object { Write-Host $_.Line }
-    if ($LASTEXITCODE -ne 0) { $failed++ }
-}
-
-if ($failed -gt 0) { Write-Host "$failed suite(s) failed" -ForegroundColor Red; exit 1 }
-Write-Host "All suites passed" -ForegroundColor Green
+if ($failed -gt 0) { Write-Host "$failed suite(s) failed"; exit 1 }
+Write-Host 'All eight suites passed. Logs: docs/test-results'

@@ -4,7 +4,7 @@ extends RefCounted
 
 
 static func punch_button(btn: Control) -> void:
-	if btn == null:
+	if btn == null or SaveService.reduced_fx:
 		return
 	btn.pivot_offset = btn.size * 0.5
 	var tween := btn.create_tween()
@@ -33,7 +33,7 @@ static func fade_out(node: CanvasItem, duration: float = 0.2) -> Tween:
 static func pop_in(node: Control, duration: float = 0.32) -> Tween:
 	node.visible = true
 	node.modulate.a = 0.0
-	node.scale = Vector2(0.86, 0.86)
+	node.scale = Vector2.ONE if SaveService.reduced_fx else Vector2(0.86, 0.86)
 	node.pivot_offset = node.size * 0.5
 	# Size may be zero on first frame — defer pivot via delayed set.
 	var tween := node.create_tween()
@@ -48,7 +48,7 @@ static func slide_down_in(node: Control, from_y: float = -40.0, duration: float 
 	node.visible = true
 	node.modulate.a = 0.0
 	var target := node.position
-	node.position = target + Vector2(0, from_y)
+	node.position = target if SaveService.reduced_fx else target + Vector2(0, from_y)
 	var tween := node.create_tween()
 	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -58,7 +58,7 @@ static func slide_down_in(node: Control, from_y: float = -40.0, duration: float 
 
 
 static func pulse_label(label: Control) -> void:
-	if label == null:
+	if label == null or SaveService.reduced_fx:
 		return
 	label.pivot_offset = label.size * 0.5
 	var tween := label.create_tween()

@@ -20,6 +20,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	UITheme.style_title(_title, UITheme.HEADING_SIZE)
 	_title.text = "Settings"
+	_shake.text = "Keep the camera still"
+	_fx.text = "Reduced motion and effects"
 	if _how_to:
 		UITheme.apply_ghost_button(_how_to)
 		_how_to.text = "How to Play"

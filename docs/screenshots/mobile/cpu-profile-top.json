@@ -1,0 +1,549 @@
+[
+  {
+    "id": 62,
+    "callFrame": {
+      "functionName": "getParameter",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 3998,
+    "positionTicks": [
+      {
+        "line": 7,
+        "ticks": 3998
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "callFrame": {
+      "functionName": "wasm-function[2238]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 1480417
+    },
+    "hitCount": 164,
+    "children": [
+      21,
+      22,
+      65,
+      145,
+      149,
+      309,
+      337,
+      375,
+      382,
+      414,
+      458,
+      477,
+      478,
+      488,
+      543,
+      544
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 164
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "callFrame": {
+      "functionName": "(program)",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 105
+  },
+  {
+    "id": 18,
+    "callFrame": {
+      "functionName": "wasm-function[2238]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 1480417
+    },
+    "hitCount": 62,
+    "children": [
+      19,
+      111,
+      185,
+      219,
+      220,
+      222,
+      224,
+      226,
+      230,
+      273,
+      302,
+      422
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 62
+      }
+    ]
+  },
+  {
+    "id": 110,
+    "callFrame": {
+      "functionName": "send",
+      "scriptId": "7",
+      "url": "http://127.0.0.1:8086/index.js",
+      "lineNumber": 0,
+      "columnNumber": 159809
+    },
+    "hitCount": 27,
+    "children": [
+      159,
+      428
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 1
+      },
+      {
+        "line": 1,
+        "ticks": 1
+      },
+      {
+        "line": 1,
+        "ticks": 25
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "callFrame": {
+      "functionName": "wasm-function[10509]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 6654097
+    },
+    "hitCount": 19,
+    "children": [
+      51,
+      73,
+      105,
+      137,
+      283,
+      502,
+      555
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 19
+      }
+    ]
+  },
+  {
+    "id": 77,
+    "callFrame": {
+      "functionName": "wasm-function[10967]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 7067737
+    },
+    "hitCount": 17,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 17
+      }
+    ]
+  },
+  {
+    "id": 159,
+    "callFrame": {
+      "functionName": "postMessage",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 17,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 17
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "callFrame": {
+      "functionName": "wasm-function[30949]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 22802246
+    },
+    "hitCount": 16,
+    "children": [
+      75,
+      442
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 16
+      }
+    ]
+  },
+  {
+    "id": 75,
+    "callFrame": {
+      "functionName": "wasm-function[845]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 595009
+    },
+    "hitCount": 15,
+    "children": [
+      76,
+      77,
+      411
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 15
+      }
+    ]
+  },
+  {
+    "id": 170,
+    "callFrame": {
+      "functionName": "bufferData",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 15,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 15
+      }
+    ]
+  },
+  {
+    "id": 53,
+    "callFrame": {
+      "functionName": "bindVertexArray",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 15,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 15
+      }
+    ]
+  },
+  {
+    "id": 184,
+    "callFrame": {
+      "functionName": "enableVertexAttribArray",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 15,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 15
+      }
+    ]
+  },
+  {
+    "id": 137,
+    "callFrame": {
+      "functionName": "wasm-function[24732]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 19298355
+    },
+    "hitCount": 15,
+    "children": [
+      138
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 15
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "callFrame": {
+      "functionName": "node.port.onmessage",
+      "scriptId": "7",
+      "url": "http://127.0.0.1:8086/index.js",
+      "lineNumber": 0,
+      "columnNumber": 161098
+    },
+    "hitCount": 15,
+    "children": [
+      109
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 3
+      },
+      {
+        "line": 1,
+        "ticks": 1
+      },
+      {
+        "line": 1,
+        "ticks": 11
+      }
+    ]
+  },
+  {
+    "id": 41,
+    "callFrame": {
+      "functionName": "wasm-function[2238]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 1480417
+    },
+    "hitCount": 13,
+    "children": [
+      42,
+      151,
+      160,
+      199,
+      260,
+      263,
+      285,
+      415,
+      493,
+      531
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 13
+      }
+    ]
+  },
+  {
+    "id": 97,
+    "callFrame": {
+      "functionName": "vertexAttribIPointer",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 12,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 12
+      }
+    ]
+  },
+  {
+    "id": 68,
+    "callFrame": {
+      "functionName": "deleteVertexArray",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 11,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 11
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "callFrame": {
+      "functionName": "wasm-function[2238]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 1480417
+    },
+    "hitCount": 11,
+    "children": [
+      34,
+      40,
+      43,
+      196,
+      200,
+      203,
+      252,
+      275,
+      298,
+      383,
+      413,
+      444,
+      473,
+      481,
+      553,
+      561
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 11
+      }
+    ]
+  },
+  {
+    "id": 171,
+    "callFrame": {
+      "functionName": "createBuffer",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 11,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 11
+      }
+    ]
+  },
+  {
+    "id": 127,
+    "callFrame": {
+      "functionName": "createVertexArray",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 11,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 11
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "callFrame": {
+      "functionName": "wasm-function[19194]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 11953614
+    },
+    "hitCount": 10,
+    "children": [
+      48,
+      259,
+      370
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 10
+      }
+    ]
+  },
+  {
+    "id": 51,
+    "callFrame": {
+      "functionName": "wasm-to-js",
+      "scriptId": "-1",
+      "url": "",
+      "lineNumber": 0,
+      "columnNumber": 0
+    },
+    "hitCount": 10,
+    "children": [
+      52,
+      54,
+      80,
+      96,
+      119,
+      183,
+      217,
+      362,
+      368,
+      440,
+      456,
+      459,
+      467,
+      506,
+      527
+    ],
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 10
+      }
+    ]
+  },
+  {
+    "id": 218,
+    "callFrame": {
+      "functionName": "vertexAttribDivisor",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "hitCount": 10,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 10
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "callFrame": {
+      "functionName": "wasm-function[31012]",
+      "scriptId": "24",
+      "url": "wasm://wasm/096bca0a",
+      "lineNumber": 0,
+      "columnNumber": 23019279
+    },
+    "hitCount": 9,
+    "positionTicks": [
+      {
+        "line": 1,
+        "ticks": 9
+      }
+    ]
+  }
+]

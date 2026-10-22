@@ -1,13 +1,15 @@
-extends Node
+﻿extends Node
 ## Renders the real game screens to PNG for visual review (needs a GPU window).
 ## Run: godot --path . res://tests/VisualCapture.tscn -- --out=C:/tmp/caps [--size=1920x1080]
 
 var _out_dir: String = "user://captures"
 var _scenario: String = "flow"
 var _main: Node
+var _allow_pause: bool = false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			_out_dir = arg.substr(6)
@@ -22,16 +24,18 @@ func _ready() -> void:
 	SaveService.load_save()
 	SaveService.profile_setup_done = true
 	SaveService.tutorial_done = true
-	SaveService.set("instructions_seen", true)
+	SaveService.set("field_guide_done", true)
 	if _scenario == "bosses":
 		await _run_bosses()
 	else:
 		await _run()
+	await _teardown()
 	get_tree().quit(0)
 
 
 func _run_bosses() -> void:
 	_main = load("res://scenes/main/Main.tscn").instantiate()
+	_main.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_main)
 	await _wait(0.5)
 	SaveService.max_level_unlocked = 15
@@ -75,9 +79,16 @@ func _run() -> void:
 	add_child(loading)
 	await _wait(0.35)
 	await _snap("01_loading")
+	# auto_enter=false deliberately skips the loader's handoff. Consume its
+	# threaded requests here so screenshot-only resource handles are released.
+	for preload_path: String in ["res://scenes/main/Main.tscn", "res://scenes/level/Level.tscn", "res://scenes/worm/Worm.tscn"]:
+		var status: ResourceLoader.ThreadLoadStatus = ResourceLoader.load_threaded_get_status(preload_path)
+		if status == ResourceLoader.THREAD_LOAD_LOADED or status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			ResourceLoader.load_threaded_get(preload_path)
 	loading.queue_free()
 
 	_main = load("res://scenes/main/Main.tscn").instantiate()
+	_main.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_main)
 	await _wait(1.6)
 	await _snap("02_main_menu")
@@ -97,9 +108,11 @@ func _run() -> void:
 	await _wait(1.0)
 	await _snap("05_gameplay_later")
 
+	_allow_pause = true
 	GameManager.pause_game()
 	await _wait(0.6)
 	await _snap("06_pause")
+	_allow_pause = false
 	GameManager.resume_game()
 	await _wait(0.3)
 
@@ -128,6 +141,13 @@ func _run() -> void:
 		await _wait(0.4)
 	await _wait(1.0)
 	await _snap("11_game_over")
+	GameManager.go_to_main_menu()
+	await _wait(0.2)
+	SaveService.field_guide_done = false
+	GameManager.start_run(0, 0)
+	await _wait(3.0)
+	await _snap("12_tutorial")
+
 
 
 func _find_chain() -> WormChain:
@@ -166,8 +186,36 @@ func _wait(seconds: float) -> void:
 
 
 func _snap(label: String) -> void:
+	if not _allow_pause and GameManager.state == GameManager.State.PAUSED:
+		GameManager.resume_game()
+		await _wait(0.3)
 	await RenderingServer.frame_post_draw
 	var img: Image = get_viewport().get_texture().get_image()
 	var path: String = "%s/%s.png" % [_out_dir, label]
 	img.save_png(path)
-	print("captured ", path)
+	print("captured ", path, " state=", GameManager.State.keys()[GameManager.state])
+
+func _process(_delta: float) -> void:
+	# Capture runs in the background while tools inspect the workspace. Keep
+	# this exception in the harness; the game still pauses on actual focus loss.
+	if not _allow_pause and GameManager.state == GameManager.State.PAUSED:
+		GameManager.resume_game()
+
+
+func _teardown() -> void:
+	_allow_pause = false
+	GameManager.go_to_main_menu()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if is_instance_valid(_main):
+		_main.queue_free()
+		_main = null
+	await get_tree().process_frame
+	await get_tree().process_frame
+	AudioManager.stop_music()
+	for child: Node in AudioManager.get_children():
+		if child is AudioStreamPlayer:
+			(child as AudioStreamPlayer).stop()
+			(child as AudioStreamPlayer).stream = null
+	# Let deferred scene frees and audio playback references settle before quit.
+	await _wait(0.15)

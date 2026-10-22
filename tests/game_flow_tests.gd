@@ -16,6 +16,7 @@ func _ready() -> void:
 	SaveService.load_save()
 	SaveService.profile_setup_done = true
 	SaveService.tutorial_done = true
+	SaveService.field_guide_done = true
 	Engine.time_scale = 2.0
 	_main = load("res://scenes/main/Main.tscn").instantiate()
 	add_child(_main)
@@ -33,10 +34,23 @@ func _ready() -> void:
 	await _test_rooster_eggs()
 	await _test_campaign_finale()
 	await _test_keyboard_focus()
+	await _test_retry_score_and_challenge_modes()
+	await _test_practice_high_score_isolation()
+	await _test_objective_refill_and_local_combo()
+	await _test_focus_loss_pauses()
+	await _test_final_shot_resolution()
+	await _test_cosmetic_rng_isolation()
 	_expect(AudioManager.composed_tracks == AudioManager.STAGE_TRACKS.size(), "composed stage music replaced every fallback drone")
 	var boss_stream := AudioManager._streams[&"stage_boss"] as AudioStreamWAV
 	_expect(boss_stream != null and boss_stream.loop_mode == AudioStreamWAV.LOOP_FORWARD and boss_stream.data.size() > 22050 * 2 * 10, "boss track is a long seamless loop")
 
+	# Release fixture scenes and active streamed audio before engine teardown.
+	AudioManager.stop_music()
+	AudioManager._music_player.stream = null
+	_main.queue_free()
+	GameManager.current_level_def = null
+	await get_tree().process_frame
+	await get_tree().process_frame
 	Engine.time_scale = 1.0
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	if _failed == 0:
@@ -385,3 +399,168 @@ func _test_keyboard_focus() -> void:
 	_expect(GameManager.last_level_previous_best == first, "replay compares against the earlier best")
 	GameManager.go_to_main_menu()
 	await _wait(0.2)
+
+
+func _test_retry_score_and_challenge_modes() -> void:
+	GameManager.start_run(0, 0)
+	await _wait(0.1)
+	GameManager.level_start_score = 1500
+	GameManager.score = 4100
+	GameManager.retry_level()
+	await _wait(0.1)
+	_expect(GameManager.score == 1500 and GameManager.level_start_score == 1500, "retry rolls back points earned during the failed attempt")
+	GameManager.start_practice(1, 1)
+	await _wait(0.1)
+	GameManager.restart_current_challenge()
+	await _wait(0.1)
+	_expect(GameManager.challenge_mode == &"practice" and GameManager.suppress_progress_save and GameManager.stage_index == 1 and GameManager.level_index == 1, "practice retry keeps its mode, level and save isolation")
+	_expect(_chain().spawns_remaining == -1, "restarted practice retains unlimited spawning")
+	GameManager.start_daily_challenge()
+	await _wait(0.1)
+	var daily_location := Vector2i(GameManager.stage_index, GameManager.level_index)
+	GameManager.restart_current_challenge()
+	await _wait(0.1)
+	_expect(GameManager.challenge_mode == &"daily" and Vector2i(GameManager.stage_index, GameManager.level_index) == daily_location, "daily retry keeps the daily challenge selection")
+	GameManager.start_run(0, 0, true)
+	await _wait(0.1)
+	GameManager.restart_current_challenge()
+	await _wait(0.1)
+	_expect(GameManager.challenge_mode == &"gauntlet" and GameManager.is_gauntlet_run, "gauntlet retry preserves gauntlet mode")
+	GameManager.go_to_main_menu()
+	await _wait(0.1)
+
+
+func _test_practice_high_score_isolation() -> void:
+	var before: int = SaveService.high_score
+	GameManager.start_practice(0, 0)
+	await _wait(0.1)
+	GameManager.score = before + 50000
+	GameManager.lives = 1
+	EventBus.chain_reached_end.emit(_chain())
+	await _wait(0.1)
+	_expect(GameManager.state == GameManager.State.GAME_OVER, "practice can finish through the normal game-over flow")
+	_expect(SaveService.high_score == before, "practice game over cannot overwrite the competitive high score")
+	GameManager.go_to_main_menu()
+	await _wait(0.1)
+
+
+func _test_objective_refill_and_local_combo() -> void:
+	var stage: StageDef = GameManager.catalog.get_stage(0)
+	var original: LevelData = stage.levels[0]
+	for kind: LevelObjective.Kind in [LevelObjective.Kind.SCORE_TARGET, LevelObjective.Kind.COMBO_TARGET, LevelObjective.Kind.SURVIVE_TIME]:
+		var fixture: LevelData = original.duplicate() as LevelData
+		fixture.objective = kind
+		fixture.target_score = 100000
+		fixture.target_combo = 3
+		fixture.survive_seconds = 60.0
+		stage.levels[0] = fixture
+		GameManager.start_run(0, 0)
+		await _wait(0.1)
+		var chain := _chain()
+		_clear_level()
+		_expect(GameManager.state == GameManager.State.PLAYING and chain.auto_spawn and chain.spawns_remaining == 12, "%s replenishes an empty chain while the goal is unmet" % LevelObjective.short_label(kind))
+		await _wait(1.0)
+		_expect(chain.get_worm_count() > 0, "%s replacement wave actually enters the playfield" % LevelObjective.short_label(kind))
+		if kind == LevelObjective.Kind.COMBO_TARGET:
+			GameManager.peak_combo = 20
+			GameManager.combo = 0
+			GameManager.level_peak_combo = 0
+			GameManager.register_match(3, WormColor.Kind.RED, 0)
+			_expect(GameManager.state == GameManager.State.PLAYING and not GameManager.objective_met and GameManager.level_peak_combo == 1, "an earlier level's peak cannot satisfy the new combo objective")
+			GameManager.register_match(3, WormColor.Kind.RED, 0)
+			GameManager.register_match(3, WormColor.Kind.RED, 0)
+			_expect(GameManager.state == GameManager.State.LEVEL_COMPLETE, "earning the combo in the current level completes its objective")
+		GameManager.go_to_main_menu()
+		await _wait(0.1)
+	stage.levels[0] = original
+
+
+func _test_focus_loss_pauses() -> void:
+	GameManager.start_run(0, 0)
+	await _wait(0.1)
+	GameManager._notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	_expect(GameManager.state == GameManager.State.PAUSED and get_tree().paused, "browser focus loss pauses the current game")
+	GameManager.resume_game()
+	_expect(GameManager.state == GameManager.State.PLAYING and not get_tree().paused, "focus-paused game resumes through the normal pause control")
+	GameManager.go_to_main_menu()
+	await _wait(0.1)
+
+
+func _test_final_shot_resolution() -> void:
+	var stage: StageDef = GameManager.catalog.get_stage(0)
+	var original: LevelData = stage.levels[0]
+	var fixture: LevelData = original.duplicate() as LevelData
+	fixture.objective = LevelObjective.Kind.LIMITED_SHOTS
+	fixture.shot_limit = 1
+	fixture.initial_worm_count = 2
+	fixture.total_worms = 2
+	fixture.march_speed = 0.0
+	fixture.path_points = PackedVector2Array([Vector2(200, 200), Vector2(1080, 200)])
+	fixture.chicken_position = Vector2(640, 500)
+	fixture.intro_tip = ""
+	stage.levels[0] = fixture
+	for saving_match: bool in [true, false]:
+		GameManager.start_run(0, 0)
+		await _wait(0.1)
+		var chain := _chain()
+		var chicken := _chicken()
+		var worms: Array[Worm] = chain.get_worms()
+		for i: int in range(worms.size()):
+			worms[i].worm_color = WormColor.Kind.RED if saving_match else (WormColor.Kind.BLUE if i == 0 else WormColor.Kind.GREEN)
+			worms[i].target_path_distance = 600.0 - float(i) * chain.worm_spacing
+			worms[i].path_distance = worms[i].target_path_distance
+		chain.step(0.0)
+		# Real projectiles continue, but hold the simulation to inspect the
+		# pending insertion before allowing its match check to settle.
+		chain.set_process(false)
+		chicken.current_color = WormColor.Kind.RED
+		chicken.aim_at(worms[0].global_position)
+		var lives_before: int = GameManager.lives
+		_expect(chicken.shoot_now() and GameManager.shots_fired == 1, "the final permitted shot launches")
+		chicken.set("_cooldown_left", 0.0)
+		_expect(not chicken.shoot_now() and GameManager.shots_fired == 1, "shot budget blocks an extra shot even with cooldown ready")
+		GameManager._check_shot_limit_fail()
+		_expect(GameManager.lives == lives_before and GameManager.state == GameManager.State.PLAYING, "exhausting the shot budget does not kill a projectile in flight")
+		var guard: int = 0
+		while not chain.is_busy() and guard < 120 and GameManager.state == GameManager.State.PLAYING:
+			await _wait(0.01)
+			guard += 1
+		_expect(chain.is_busy(), "last shot reaches a real chain insertion")
+		GameManager._check_shot_limit_fail()
+		_expect(GameManager.lives == lives_before, "shot-budget judgment waits for the pending match")
+		chain.set_process(true)
+		await _wait(0.4)
+		if saving_match:
+			_expect(GameManager.state == GameManager.State.LEVEL_COMPLETE and GameManager.lives == lives_before, "the final permitted shot can match and win the level")
+		else:
+			_expect(GameManager.lives == lives_before - 1 and GameManager.shots_fired == 0 and GameManager.state == GameManager.State.PLAYING, "an unscored final shot costs one life only after resolution and retries cleanly")
+		GameManager.go_to_main_menu()
+		await _wait(0.1)
+	stage.levels[0] = original
+
+
+func _test_cosmetic_rng_isolation() -> void:
+	GameManager.start_run(0, 0)
+	await _wait(0.1)
+	var chicken := _chicken()
+	var cosmetic_worm: Worm = preload("res://scenes/worm/Worm.tscn").instantiate()
+	_level_host().get_child(0).get_node("FX").add_child(cosmetic_worm)
+	cosmetic_worm.setup(WormColor.Kind.RED, 0.0)
+	var gameplay_state: int = GameManager.get_rng().state
+	var fx_state: int = GameManager.get_fx_rng().state
+	var sound_index: int = AudioManager._sfx_index
+	AudioManager._on_chicken_shot(WormColor.Kind.RED, chicken.global_position, Vector2.RIGHT)
+	_expect(AudioManager._sfx_index != sound_index and GameManager.get_rng().state == gameplay_state, "real shot sound variations leave the gameplay RNG unchanged")
+	JuiceDirector.spawn_pop(chicken.global_position, WormColor.get_fill(WormColor.Kind.RED), 1.0)
+	_expect(GameManager.get_rng().state == gameplay_state, "real particle generation leaves the next worm sequence unchanged")
+	cosmetic_worm.begin_fall()
+	_expect(cosmetic_worm.state == Worm.State.FALLING and GameManager.get_rng().state == gameplay_state, "random worm fall drift does not affect gameplay randomness")
+	chicken.set("_is_blinking", true)
+	chicken.set("_blink_left", 0.0)
+	chicken.set("_idle_peck_timer", 0.0)
+	chicken.reaction = &""
+	chicken._update_idle(0.1)
+	_expect(float(chicken.get("_blink_timer")) > 0.0 and GameManager.get_rng().state == gameplay_state, "blink and idle animation scheduling cannot alter future shot colors")
+	_expect(GameManager.get_fx_rng().state != fx_state, "the exercised effects consumed their separate cosmetic RNG")
+	GameManager.go_to_main_menu()
+	await _wait(0.1)

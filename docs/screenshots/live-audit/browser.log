@@ -1,0 +1,8 @@
+log: Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+log: OpenGL API OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium)) - Compatibility - Using Device: WebKit - WebKit WebGL
+log: Build configuration: Emscripten 4.0.20, single-threaded, no GDExtension support.
+error: ERROR: Can't open file from path 'res://audio/music/menu_farmyard_loop.ogg'.
+error:    at: get_file_as_bytes (core/io/file_access.cpp:907)
+error: ERROR: Cannot open file 'res://audio/music/menu_farmyard_loop.ogg'.
+error:    at: load_from_file (modules/vorbis/audio_stream_ogg_vorbis.cpp:703)
+browser RAF frame ms: median=216.4, p95=366.4

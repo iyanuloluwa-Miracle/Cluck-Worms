@@ -9,6 +9,7 @@ var player_name: String = ""
 var player_id: String = ""
 var mode: String = ""
 var _host_paused: bool = false
+var _js_browser_pause_cb: JavaScriptObject
 var _js_pause_cb: JavaScriptObject
 var _js_resume_cb: JavaScriptObject
 var _js_purchase_cb: JavaScriptObject
@@ -20,6 +21,7 @@ func _ready() -> void:
 	if not OS.has_feature("web"):
 		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	EventBus.game_state_changed.connect(_on_web_state)
 	EventBus.game_over.connect(_on_game_over)
 	EventBus.level_completed.connect(_on_level_completed)
 	call_deferred("_boot")
@@ -38,6 +40,8 @@ func _boot() -> void:
 		return
 	var bridge: Variant = win.CluckVatar
 
+	_js_browser_pause_cb = JavaScriptBridge.create_callback(_on_browser_pause)
+	bridge.onBrowserPause(_js_browser_pause_cb)
 	_js_pause_cb = JavaScriptBridge.create_callback(_on_host_pause)
 	_js_resume_cb = JavaScriptBridge.create_callback(_on_host_resume)
 	_js_purchase_cb = JavaScriptBridge.create_callback(_on_host_purchase)
@@ -108,6 +112,12 @@ func _grant_product(product_id: String) -> void:
 			push_warning("VatarBridge: unknown product %s" % product_id)
 
 
+func _on_browser_pause(_args: Array = []) -> void:
+	# Visibility/orientation pauses require the player's explicit Resume.
+	if GameManager.state == GameManager.State.PLAYING:
+		GameManager.pause_game()
+
+
 func _on_host_pause(_args: Array = []) -> void:
 	if _host_paused:
 		return
@@ -121,7 +131,7 @@ func _on_host_resume(_args: Array = []) -> void:
 	if not _host_paused:
 		return
 	_host_paused = false
-	AudioServer.set_bus_mute(0, false)
+	AudioManager.apply_mix(SaveService.master_volume, SaveService.sfx_volume, SaveService.music_volume, SaveService.mute_all)
 	if GameManager.state == GameManager.State.PAUSED:
 		GameManager.resume_game()
 
@@ -190,3 +200,8 @@ func _await_js_promise(promise: Variant) -> Variant:
 	_pending_cbs.erase(on_ok)
 	_pending_cbs.erase(on_err)
 	return done[1]
+
+
+func _on_web_state(_previous: int, next: int) -> void:
+	var hide: String = "false" if next == GameManager.State.MAIN_MENU else "true"
+	JavaScriptBridge.eval("var b = document.getElementById('fullscreen'); if (b) b.hidden = " + hide + " || !document.fullscreenEnabled;")

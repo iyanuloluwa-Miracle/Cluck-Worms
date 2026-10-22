@@ -152,6 +152,7 @@ func step(delta: float) -> void:
 	_process_reverse(delta)
 	_resolve_contacts(gaps_before)
 	_process_pending_checks(delta)
+	_prune_gap_state()
 
 	_sync_worm_transforms(delta)
 	if not is_busy():
@@ -543,13 +544,11 @@ func _advance_rear_segment(delta: float) -> void:
 func _process_reverse(delta: float) -> void:
 	## Front segments whose gap edges match roll backward; others stand still.
 	var segs: Array[Vector2i] = _segments()
-	var live_keys: Dictionary = {}
 	for s: int in range(segs.size() - 1):
 		var seg: Vector2i = segs[s]
 		var tail: Worm = _worms[seg.y]
 		var behind: Worm = _worms[seg.y + 1]
 		var key: int = tail.get_instance_id()
-		live_keys[key] = true
 		if not _colors_link(tail, behind):
 			_reverse_speed[key] = 0.0
 			continue
@@ -567,12 +566,17 @@ func _process_reverse(delta: float) -> void:
 		for i: int in range(seg.x, seg.y + 1):
 			_worms[i].target_path_distance -= move
 			_worms[i].path_distance -= move
-	# Forget gaps that no longer exist.
+
+
+func _prune_gap_state() -> void:
+	# Keep closed-gap metadata until contact checks consume its cascade depth.
+	# A rear segment can close a gap before reverse processing sees it.
+	var live_keys: Array[int] = _gap_tail_ids()
 	for key: Variant in _reverse_speed.keys():
-		if not live_keys.has(key):
+		if not live_keys.has(int(key)):
 			_reverse_speed.erase(key)
 	for key: Variant in _gap_depth.keys():
-		if not live_keys.has(key):
+		if not live_keys.has(int(key)):
 			_gap_depth.erase(key)
 
 
@@ -673,10 +677,19 @@ func _find_run(index: int) -> Array[int]:
 	var seed: Worm = _worms[index]
 	var candidates: Array[int] = []
 	if seed.worm_type == WormType.Kind.RAINBOW:
-		for n: int in [index - 1, index + 1]:
-			if n >= 0 and n < _worms.size() and _worms[n].worm_type != WormType.Kind.RAINBOW:
-				if (n < index and _is_connected(n)) or (n > index and _is_connected(index)):
-					candidates.append(int(_worms[n].worm_color))
+		# Find the first real color on both sides of a contiguous wildcard span.
+		for direction: int in [-1, 1]:
+			var n: int = index + direction
+			while n >= 0 and n < _worms.size():
+				var joint: int = n if direction < 0 else n - 1
+				if not _is_connected(joint):
+					break
+				if _worms[n].worm_type != WormType.Kind.RAINBOW:
+					var color: int = int(_worms[n].worm_color)
+					if not candidates.has(color):
+						candidates.append(color)
+					break
+				n += direction
 		if candidates.is_empty():
 			candidates.append(int(seed.worm_color))
 	else:
@@ -874,7 +887,7 @@ func _kickoff_falls(removed: Array[Worm]) -> void:
 		return
 	await tree.create_timer(Worm.MATCH_POP_DURATION, false).timeout
 	for worm: Worm in removed:
-		if is_instance_valid(worm) and worm.state == Worm.State.MATCHED:
+		if is_instance_valid(worm) and worm.is_inside_tree() and not worm.is_queued_for_deletion() and worm.state == Worm.State.MATCHED:
 			worm.begin_fall()
 
 

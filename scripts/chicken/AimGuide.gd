@@ -27,7 +27,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_anim_time += delta
+	if not SaveService.reduced_fx:
+		_anim_time += delta
 	if shoot_flash > 0.0:
 		shoot_flash = maxf(shoot_flash - delta * 4.5, 0.0)
 	queue_redraw()
@@ -53,29 +54,30 @@ func update_trajectory(
 	_has_chain_target = false
 	_is_match_target = false
 
-	# Raycast against active worms in the chain.
+	# Use precisely the same swept collision geometry as the real projectile.
 	if chain != null and is_instance_valid(chain):
-		var worms: Array[Worm] = chain.get_worms()
-		for worm: Worm in worms:
+		var ray_end: Vector2 = muzzle_global + aim_dir * max_aim_length
+		for worm: Worm in chain.get_worms():
 			if not chain.is_worm_targetable(worm):
 				continue
-			var to_worm: Vector2 = worm.global_position - muzzle_global
-			var proj: float = to_worm.dot(aim_dir)
-			if proj < min_aim_length or proj >= best_dist:
+			var contact: Dictionary = ShootingWorm._segment_circle_hit(
+				muzzle_global, ray_end, worm.global_position, ShootingWorm.CHAIN_HIT_RADIUS
+			)
+			if contact.is_empty():
 				continue
-			var perp_dist_sq: float = (to_worm - aim_dir * proj).length_squared()
-			# Worm collision radius (~24px).
-			var hit_radius: float = 26.0
-			if perp_dist_sq <= hit_radius * hit_radius:
-				best_dist = proj
-				_has_chain_target = true
-				_is_match_target = (
-					worm.worm_color == current_color
-					or worm.worm_type == WormType.Kind.RAINBOW
-				)
+			var distance: float = float(contact["t"]) * max_aim_length
+			if distance >= best_dist:
+				continue
+			best_dist = distance
+			_has_chain_target = true
+			_is_match_target = (
+				worm.worm_color == current_color
+				or worm.worm_type == WormType.Kind.RAINBOW
+			)
 
-	_current_target_dist = best_dist
-	_target_point = Vector2(best_dist, 0.0)
+	# This node is at the launcher pivot; ray distances start at the muzzle.
+	_current_target_dist = start_offset + best_dist
+	_target_point = Vector2(_current_target_dist, 0.0)
 
 
 func _draw() -> void:

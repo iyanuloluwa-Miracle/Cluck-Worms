@@ -10,7 +10,7 @@ const NEST_CLEARANCE: float = 168.0
 ## Soft top margin so the chain clears floating HUD wells (Safe top 10 + bar 72 + pad).
 const HUD_TOP_SAFE: float = 118.0
 ## Keep clear of the bottom NEXT chip / status strip.
-const HUD_BOTTOM_SAFE: float = 648.0
+const HUD_BOTTOM_SAFE: float = 610.0
 const PLAYFIELD_WIDTH: float = 1280.0
 const PLAYFIELD_MARGIN_X: float = 28.0
 

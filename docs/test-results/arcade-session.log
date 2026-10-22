@@ -1,0 +1,31 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+--- Running Real-Projectile Arcade Session Tests ---
+  OK  desktop: first campaign level starts
+  OK  desktop: complete 1280x720 logical arena is retained
+  OK  desktop: framing preserves the arena aspect ratio
+  OK  desktop: full track fits inside logical viewport including worm radius
+  OK  desktop: screen aiming round-trips through the active camera transform
+  SESSION desktop simulated=31.80s wall=31.92s shots=69 hits=62 matches=29 swaps=20 removed=90 score=11410 lives=3 state=3
+  OK  desktop: completes the first level using actual aimed projectiles
+  OK  desktop: completes without losing a life
+  OK  desktop: shots produce real collisions and matches
+  OK  desktop: natural spawn budget exhausted and every worm cleared
+  OK  desktop: removed worms equal the original wave plus actual projectile insertions
+  OK  desktop: natural win unlocks level two
+  OK  desktop: earned stars and score survive save reload
+  OK  phone_landscape: first campaign level starts
+  OK  phone_landscape: complete 1280x720 logical arena is retained
+  OK  phone_landscape: framing preserves the arena aspect ratio
+  OK  phone_landscape: full track fits inside logical viewport including worm radius
+  OK  phone_landscape: screen aiming round-trips through the active camera transform
+  SESSION phone_landscape simulated=31.53s wall=31.58s shots=62 hits=55 matches=26 swaps=21 removed=83 score=10441 lives=3 state=3
+  OK  phone_landscape: completes the first level using actual aimed projectiles
+  OK  phone_landscape: completes without losing a life
+  OK  phone_landscape: shots produce real collisions and matches
+  OK  phone_landscape: natural spawn budget exhausted and every worm cleared
+  OK  phone_landscape: removed worms equal the original wave plus actual projectile insertions
+  OK  phone_landscape: natural win unlocks level two
+  OK  phone_landscape: earned stars and score survive save reload
+Cluck & Worms arcade session tests: ALL PASSED
+

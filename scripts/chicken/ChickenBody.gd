@@ -1,17 +1,11 @@
-extends Node2D
-## Procedural premium cartoon chicken. Beak faces local +X (aim direction).
-## Richer anatomy: rounder body, feather detail, expressive eyes, dynamic comb.
+﻿extends Node2D
+## Original cream-feathered garden defender. Beak faces local +X.
+## Every part is vector artwork, keeping the character crisp at any viewport.
 
-const BODY_RADIUS_X: float = 32.0
-const BODY_RADIUS_Y: float = 27.0
-const HEAD_RADIUS: float = 19.0
-const HEAD_OFFSET: Vector2 = Vector2(24.0, -11.0)
-const BEAK_LENGTH: float = 17.0
-const COMB_HEIGHT: float = 14.0
-const WATTLE_SIZE: float = 7.0
-const EYE_RADIUS: float = 5.0
-const PUPIL_RADIUS: float = 2.5
-
+const INK := Color("51452e")
+const FEATHER := Color("fff3c7")
+const FEATHER_SHADE := Color("d6c58e")
+const COMB := Color("e55944")
 var _wing_phase: float = 0.0
 var _tail_phase: float = 0.0
 var _redraw_accum: float = 0.0
@@ -20,198 +14,104 @@ var _redraw_accum: float = 0.0
 func _process(delta: float) -> void:
 	var chicken: Chicken = get_parent().get_parent() as Chicken
 	var celebrating: bool = chicken != null and chicken.is_celebrating()
-	var flap: float = 9.0 if celebrating else 3.5
-	_wing_phase += delta * flap
-	_tail_phase += delta * 1.8
-	var interval: float = QualitySettings.chicken_redraw_interval
-	if interval <= 0.0:
-		queue_redraw()
-		return
+	if not SaveService.reduced_fx:
+		_wing_phase += delta * (9.0 if celebrating else 3.5)
+		_tail_phase += delta * 1.8
 	_redraw_accum += delta
-	if _redraw_accum >= interval:
+	if _redraw_accum >= maxf(QualitySettings.chicken_redraw_interval, 0.025):
 		_redraw_accum = 0.0
 		queue_redraw()
 
 
 func _draw() -> void:
-	# Body → AimPivot → Chicken
 	var chicken: Chicken = get_parent().get_parent() as Chicken
 	var blinking: bool = chicken != null and chicken.is_blinking()
 	var peck: float = chicken.get_peck_amount() if chicken else 0.0
 	var celebrating: bool = chicken != null and chicken.is_celebrating()
+	_ellipse(Vector2(2, 28), Vector2(36, 10), Color(0.03, 0.07, 0.04, 0.26))
 
-	# --- Ground shadow ---
-	_fill_ellipse(Vector2(2.0, 32.0), Vector2(30.0, 9.0), Color(0.0, 0.0, 0.0, 0.20))
-
-	# --- Body gradient (outline + fill + inner highlight) ---
-	var body_fill := Color(1.0, 0.92, 0.42)
-	var body_highlight := Color(1.0, 0.98, 0.72)
-	var body_outline := Color(0.68, 0.42, 0.10)
-	var body_shadow := Color(0.88, 0.72, 0.28)
-
-	# Outline
-	_draw_oval(Vector2.ZERO, BODY_RADIUS_X + 2.5, BODY_RADIUS_Y + 2.0, body_outline)
-	# Base fill
-	_draw_oval(Vector2.ZERO, BODY_RADIUS_X, BODY_RADIUS_Y, body_fill)
-	# Inner top highlight for roundness.
-	_fill_ellipse(Vector2(-6.0, -10.0), Vector2(20.0, 11.0), Color(body_highlight.r, body_highlight.g, body_highlight.b, 0.48))
-	# Bottom shading for depth.
-	_fill_ellipse(Vector2(0.0, 14.0), Vector2(22.0, 9.0), Color(body_shadow.r, body_shadow.g, body_shadow.b, 0.4))
-
-	# --- Belly patch ---
-	_draw_oval(Vector2(-2.0, 8.0), 17.0, 13.0, Color(1.0, 0.98, 0.82))
-
-	# --- Tail feathers (animated bob) ---
-	var tail_cols: Array[Color] = [
-		Color(0.95, 0.30, 0.22),
-		Color(0.98, 0.72, 0.18),
-		Color(0.88, 0.42, 0.12),
-		Color(0.70, 0.22, 0.55),
-	]
-	for i: int in range(4):
-		var tail_sway: float = sin(_tail_phase + float(i) * 0.7) * 2.5
-		var ang: float = deg_to_rad(148.0 + float(i) * 22.0)
-		var tip: Vector2 = Vector2.from_angle(ang) * (36.0 + float(i % 2) * 4.0) + Vector2(-10.0, -4.0 + tail_sway)
-		var feather_w: float = 7.0 - float(i) * 1.2
-		draw_line(Vector2(-20.0, -1.0), tip, tail_cols[i], feather_w, true)
-		draw_circle(tip, feather_w * 0.55, tail_cols[i].lightened(0.12))
-		# Feather tip shine.
-		draw_circle(tip + Vector2(-1.0, -1.0), feather_w * 0.25, Color(1, 1, 1, 0.5))
-
-	# --- Wing (animated flap with feather detail) ---
-	var wing_y: float = sin(_wing_phase) * (5.0 if celebrating else 3.5)
-	var wing_col := Color(0.96, 0.80, 0.30)
-	var wing_outline_col := Color(0.65, 0.40, 0.08)
-	var wing_pts := PackedVector2Array([
-		Vector2(-8.0, 3.0 + wing_y),
-		Vector2(12.0, 9.5 + wing_y),
-		Vector2(6.0, 22.0 + wing_y),
-		Vector2(-8.0, 20.0 + wing_y),
-		Vector2(-18.0, 12.0 + wing_y),
-	])
-	draw_colored_polygon(wing_pts, wing_col)
-	draw_polyline(PackedVector2Array([
-		wing_pts[0], wing_pts[1], wing_pts[2], wing_pts[3], wing_pts[4], wing_pts[0],
-	]), wing_outline_col, 2.0, true)
-	# Wing feather lines.
-	for wf: int in range(3):
-		var wfp := Vector2(lerpf(-12.0, 6.0, float(wf) / 2.0), 18.0 + wing_y)
-		draw_line(wfp, wfp + Vector2(8.0, -10.0), wing_col.darkened(0.15), 1.2, true)
-
-	# --- Head (nudges forward on peck / celebrate bounce) ---
-	var head: Vector2 = HEAD_OFFSET + Vector2(peck * 7.0, -peck * 2.5)
-	if celebrating:
-		head += Vector2(0.0, -3.0)
-	# Head outline + fill.
-	_draw_oval(head, HEAD_RADIUS + 2.0, HEAD_RADIUS + 1.5, body_outline)
-	_draw_oval(head, HEAD_RADIUS, HEAD_RADIUS - 0.5, body_fill)
-	# Head top highlight for roundness.
-	_fill_ellipse(head + Vector2(-3.0, -7.0), Vector2(10.0, 6.0), Color(body_highlight.r, body_highlight.g, body_highlight.b, 0.52))
-
-	# --- Comb (3 lobes with outline and highlight) ---
-	var comb_col := Color(0.92, 0.18, 0.20)
-	var comb_outline := Color(0.52, 0.06, 0.08)
+	# Layered fan tail, in the same cream family as the body.
 	for i: int in range(3):
-		var cx: float = head.x - 7.0 + float(i) * 7.5
-		var cy: float = head.y - HEAD_RADIUS + 1.5
-		var comb_offset: float = sin(_tail_phase * 1.2 + float(i) * 0.8) * (2.0 if celebrating else 0.8)
-		# Lobe outline.
-		draw_circle(Vector2(cx, cy - COMB_HEIGHT * 0.38 + comb_offset), 6.0, comb_outline)
-		draw_circle(Vector2(cx, cy - COMB_HEIGHT * 0.75 + comb_offset), 4.0, comb_outline)
-		# Lobe fill.
-		draw_circle(Vector2(cx, cy - COMB_HEIGHT * 0.38 + comb_offset), 5.0, comb_col)
-		draw_circle(Vector2(cx, cy - COMB_HEIGHT * 0.75 + comb_offset), 3.2, comb_col)
-		# Lobe highlight.
-		draw_circle(Vector2(cx - 1.5, cy - COMB_HEIGHT * 0.45 + comb_offset), 1.8, Color(1, 0.65, 0.65, 0.70))
+		var sway: float = sin(_tail_phase + i * 0.5) * 1.6
+		var tip := Vector2(-43 + i * 4, -20 + i * 12 + sway)
+		draw_line(Vector2(-21, 0), tip, INK, 14, true)
+		draw_circle(tip, 7, INK)
+		draw_line(Vector2(-21, 0), tip, FEATHER_SHADE, 10.5, true)
+		draw_circle(tip, 5.2, FEATHER)
+		draw_line(Vector2(-26, -1), tip + Vector2(3, 1), Color("b6a875"), 1.0, true)
 
-	# --- Wattle (double teardrop) ---
-	draw_circle(head + Vector2(5.0, 11.0), WATTLE_SIZE * 0.62, comb_outline)
-	draw_circle(head + Vector2(3.5, 15.5), WATTLE_SIZE * 0.45, comb_outline)
-	draw_circle(head + Vector2(5.0, 11.0), WATTLE_SIZE * 0.52, comb_col)
-	draw_circle(head + Vector2(3.5, 15.5), WATTLE_SIZE * 0.36, comb_col)
+	# Compact orange feet sit behind the plump body.
+	for x: float in [-9.0, 7.0]:
+		draw_line(Vector2(x, 21), Vector2(x + 2, 30), INK, 4.0, true)
+		draw_line(Vector2(x + 2, 30), Vector2(x + 10, 31), Color("e5a44c"), 3.0, true)
+		draw_line(Vector2(x + 2, 30), Vector2(x - 3, 33), Color("e5a44c"), 2.5, true)
+	_ellipse(Vector2.ZERO, Vector2(34, 28), INK)
+	_ellipse(Vector2(0, -1), Vector2(31.5, 25.5), FEATHER_SHADE)
+	_ellipse(Vector2(-1, -5), Vector2(30, 21.5), FEATHER)
+	_ellipse(Vector2(-7, -14), Vector2(17, 7), Color("fffbe5"))
 
-	# --- Beak (opens on peck, clearly points +X) ---
-	var beak_open: float = peck * 4.0
-	var beak_base: Vector2 = head + Vector2(HEAD_RADIUS - 1.5, 2.0)
-	var beak_col := Color(1.0, 0.65, 0.12)
-	var beak_outline := Color(0.70, 0.30, 0.05)
-	# Upper jaw.
-	var upper_beak := PackedVector2Array([
-		beak_base + Vector2(0.0, -7.5 - beak_open * 0.35),
-		beak_base + Vector2(BEAK_LENGTH + peck * 2.5, 1.0),
-		beak_base + Vector2(0.0, 1.5),
-	])
-	draw_colored_polygon(upper_beak, beak_outline)
-	var upper_inner := PackedVector2Array([
-		beak_base + Vector2(0.5, -5.5 - beak_open * 0.3),
-		beak_base + Vector2(BEAK_LENGTH - 2.0 + peck * 2.5, 0.8),
-		beak_base + Vector2(0.5, 0.8),
-	])
-	draw_colored_polygon(upper_inner, beak_col)
-	# Lower jaw.
-	if beak_open > 0.1:
-		var lower_beak := PackedVector2Array([
-			beak_base + Vector2(0.0, 2.5),
-			beak_base + Vector2(BEAK_LENGTH * 0.8 + peck, 2.5 + beak_open),
-			beak_base + Vector2(0.0, 8.5 + beak_open),
-		])
-		draw_colored_polygon(lower_beak, beak_outline)
-		var lower_inner := PackedVector2Array([
-			beak_base + Vector2(0.5, 3.2),
-			beak_base + Vector2(BEAK_LENGTH * 0.75 + peck, 3.2 + beak_open * 0.7),
-			beak_base + Vector2(0.5, 7.2 + beak_open * 0.8),
-		])
-		draw_colored_polygon(lower_inner, beak_col)
-	# Beak highlight line.
-	draw_line(
-		beak_base + Vector2(1.5, -3.0),
-		beak_base + Vector2(BEAK_LENGTH - 3.0 + peck * 2.0, -0.5),
-		Color(1.0, 0.88, 0.55, 0.75),
-		1.8,
-		true
-	)
+	# A forest-green kerchief is the hero's signature.
+	var scarf := PackedVector2Array([Vector2(14, -14), Vector2(31, -10), Vector2(30, 7), Vector2(17, 15), Vector2(11, 9)])
+	draw_colored_polygon(scarf, Color("305c48"))
+	draw_polyline(PackedVector2Array([scarf[0], scarf[1], scarf[2], scarf[3], scarf[4], scarf[0]]), INK, 1.6, true)
+	draw_colored_polygon(PackedVector2Array([Vector2(19, 11), Vector2(23, 26), Vector2(31, 18), Vector2(26, 8)]), Color("46765a"))
+	draw_circle(Vector2(24, 10), 4.0, Color("bca65c"))
+	draw_circle(Vector2(24, 9), 2.3, Color("f4dc81"))
 
-	# --- Eyes ---
-	var eye_pos: Vector2 = head + Vector2(5.0, -5.0)
+	var head := Vector2(25.0 + peck * 7.0, -13.0 - peck * 2.5 - (2.0 if celebrating else 0.0))
+	# Large scalloped comb forms a memorable silhouette.
+	for i: int in range(3):
+		var p: Vector2 = head + Vector2(-8 + i * 7, -20 - (4 if i == 1 else 0))
+		draw_circle(p, 6.8, Color("833a2c"))
+		draw_circle(p + Vector2(0, -0.5), 4.9, COMB)
+		draw_circle(p + Vector2(-1.5, -2), 1.7, Color("f99774"))
+	_ellipse(head, Vector2(20, 19), INK)
+	_ellipse(head + Vector2(0, -1), Vector2(17.8, 16.8), FEATHER)
+	_ellipse(head + Vector2(-4, -8), Vector2(9, 5), Color("fffbe8"))
+
+	# Amber beak has a clear point and opens on the firing impulse.
+	var beak: Vector2 = head + Vector2(16, 3)
+	var jaw: float = peck * 4.0
+	var outline := PackedVector2Array([beak + Vector2(-1, -7), beak + Vector2(19, 0), beak + Vector2(0, 8 + jaw)])
+	draw_colored_polygon(outline, Color("8b592d"))
+	draw_colored_polygon(PackedVector2Array([beak + Vector2(1, -4.5), beak + Vector2(15.5, -0.5), beak + Vector2(1, 1.5)]), Color("ffd177"))
+	draw_colored_polygon(PackedVector2Array([beak + Vector2(1, 3 + jaw * 0.2), beak + Vector2(13, 2), beak + Vector2(1, 5.5 + jaw)]), Color("e9a340"))
+	draw_circle(head + Vector2(8, 15), 5.0, Color("a24a35"))
+	draw_circle(head + Vector2(7, 14), 3.6, COMB)
+
+	# One oversized readable eye with a determined brow.
+	var eye: Vector2 = head + Vector2(7, -5)
 	if blinking:
-		# Squint line.
-		draw_line(eye_pos + Vector2(-6.0, 1.0), eye_pos + Vector2(6.0, -1.0), Color(0.20, 0.14, 0.08), 3.0, true)
+		draw_arc(eye + Vector2(0, -1), 5.5, 0.1, PI - 0.1, 12, INK, 2.2, true)
 	else:
-		# Eye socket.
-		draw_circle(eye_pos, EYE_RADIUS + 1.5, Color(0.16, 0.10, 0.05))
-		# Sclera.
-		draw_circle(eye_pos, EYE_RADIUS, Color.WHITE)
-		# Iris.
-		draw_circle(eye_pos + Vector2(1.2, 0.5), EYE_RADIUS * 0.55, Color(0.22, 0.62, 0.30))
-		# Pupil.
-		var pupil: Vector2 = eye_pos + Vector2(1.8, 0.5)
-		draw_circle(pupil, PUPIL_RADIUS, Color(0.08, 0.08, 0.08))
-		# Eye shine (two points for liveliness).
-		draw_circle(pupil + Vector2(-1.0, -1.2), 1.1, Color.WHITE)
-		draw_circle(pupil + Vector2(1.2, 0.6), 0.6, Color(1, 1, 1, 0.65))
+		_ellipse(eye, Vector2(6.3, 7), INK)
+		_ellipse(eye + Vector2(0, -0.2), Vector2(4.8, 5.7), Color("fffef2"))
+		draw_circle(eye + Vector2(1.4, 0.8), 2.9, Color("263c30"))
+		draw_circle(eye + Vector2(0.6, -0.4), 1.2, Color.WHITE)
+	draw_line(head + Vector2(2, -14), head + Vector2(11, -12), INK, 2.0, true)
+	_ellipse(head + Vector2(4, 5.5), Vector2(4.2, 2.5), Color(0.91, 0.43, 0.29, 0.45))
 
-	# --- Cheek blush ---
-	var blush_a: float = 0.65 if celebrating else 0.42
-	var blush_size: float = 4.5 if celebrating else 3.8
-	draw_circle(head + Vector2(1.5, 6.5), blush_size, Color(1.0, 0.52, 0.42, blush_a))
+	# Scalloped wing covers the body with three feather tips.
+	var wing_y: float = sin(_wing_phase) * (4.0 if celebrating else 1.8)
+	var wing := PackedVector2Array([Vector2(-20, 1 + wing_y), Vector2(-8, -5 + wing_y), Vector2(11, 3 + wing_y), Vector2(7, 17 + wing_y), Vector2(2, 20 + wing_y), Vector2(-4, 19 + wing_y), Vector2(-8, 21 + wing_y), Vector2(-16, 17 + wing_y), Vector2(-22, 9 + wing_y)])
+	draw_colored_polygon(wing, Color("e7d69e"))
+	wing.append(wing[0])
+	draw_polyline(wing, Color("aa9560"), 1.8, true)
+	draw_arc(Vector2(-7, 3 + wing_y), 10, 0.2, 2.2, 14, Color("fff3c7"), 2.5, true)
+	for i: int in range(2):
+		draw_line(Vector2(-7 + i * 7, 17 + wing_y), Vector2(-3 + i * 7, 10 + wing_y), Color("b6a16d"), 1.2, true)
 
-	# --- Celebration sparkle ring ---
-	if celebrating:
-		for sp: int in range(5):
-			var sp_ang: float = _wing_phase * 2.0 + float(sp) * TAU / 5.0
-			var sp_pos: Vector2 = head + Vector2.from_angle(sp_ang) * 24.0
-			var sp_s: float = 1.8 + sin(_wing_phase * 3.0 + float(sp)) * 0.8
-			draw_circle(sp_pos, sp_s, Color(1.0, 0.92, 0.3, 0.85))
+	if celebrating and not SaveService.reduced_fx:
+		for i: int in range(4):
+			var a: float = _wing_phase * 0.5 + float(i) * TAU / 4.0
+			var p: Vector2 = head + Vector2.from_angle(a) * 29.0
+			draw_line(p - Vector2(3, 0), p + Vector2(3, 0), Color("ffe7a0"), 1.7, true)
+			draw_line(p - Vector2(0, 3), p + Vector2(0, 3), Color("ffe7a0"), 1.7, true)
 
 
-func _draw_oval(center: Vector2, radius_x: float, radius_y: float, color: Color, _pad: float = 0.0) -> void:
+func _ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
-	var segments: int = 28
-	for i: int in range(segments):
-		var a: float = TAU * float(i) / float(segments)
-		points.append(center + Vector2(cos(a) * radius_x, sin(a) * radius_y))
+	for i: int in range(32):
+		var a: float = float(i) * TAU / 32.0
+		points.append(center + Vector2(cos(a), sin(a)) * radii)
 	draw_colored_polygon(points, color)
-
-
-func _fill_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
-	_draw_oval(center, radii.x, radii.y, color)

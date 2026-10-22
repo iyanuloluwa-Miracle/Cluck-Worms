@@ -1,0 +1,31 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+  OK  first campaign shows field training
+  OK  training preserves live gameplay
+  OK  first step explains firing
+  OK  live shot is accepted during training
+  OK  real shot advances the guide
+  OK  HUD swap exchanges live ammunition
+  OK  live swap advances training
+  OK  current HUD swatch follows swapped ammo
+  OK  HUD names current color alongside its symbol
+  OK  match completes the three event-driven lessons
+  OK  completed training survives a save reload
+  OK  completed tutorial stays dismissed on retry
+  OK  How To Play training button resets and starts the live lesson
+  OK  skip remains available and persists
+Godot_v4.7.2-stable_win64_console.exe : WARNING: SaveService: could not write user://missing_field_guide_test_directory/save.cfg (error 7)
+At C:\Users\Iyanu\OneDrive\Desktop\Cluck & Worms\tools\run_tests.ps1:31 char:15
++ ...   $output = & $Godot --headless --path $projectRoot @suiteArgs 2>&1 | ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: SaveSe...e.cfg (error 7):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] save (res://autoload/SaveService.gd:249)
+       [1] _ready (res://tests/guide_tests.gd:51)
+  OK  failed save remains queued for retry
+  OK  successful retry clears queued writes
+Field guide tests: ALL PASSED
+

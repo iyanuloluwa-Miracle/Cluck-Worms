@@ -1,0 +1,19 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+--- Running Cluck & Worms Core Tests ---
+  OK  base 3-match = 300
+  OK  larger match scores more
+  OK  cascade depth adds score
+  OK  combo multiplies score
+  OK  high score + lives earns 3 stars
+  OK  any clear earns at least 1 star
+  OK  nest point pushed out
+  OK  far point unchanged
+  OK  3 stages in campaign
+  OK  15 campaign levels
+  OK  stage 1 ends with boss
+  OK  stage 1 level 3 is score target
+  OK  stage 2 has survive objective
+  OK  boss_slayer achievement exists
+Cluck & Worms core tests: ALL PASSED
+

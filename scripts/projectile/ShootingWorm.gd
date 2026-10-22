@@ -13,8 +13,11 @@ extends Area2D
 ## Max lifetime before auto-despawn (seconds).
 @export var max_lifetime: float = 2.5
 
+const DEFAULT_HIT_RADIUS: float = 16.0
+const CHAIN_HIT_RADIUS: float = DEFAULT_HIT_RADIUS + Worm.HEAD_RADIUS * 0.85
+
 ## Collision radius used for chain worm hits.
-@export var hit_radius: float = 16.0
+@export var hit_radius: float = DEFAULT_HIT_RADIUS
 
 ## How far ahead of the sprite the hit probe sits (beak-lead feel).
 @export var hit_lead: float = 4.0
@@ -90,8 +93,10 @@ func _physics_process(delta: float) -> void:
 		_ghost_positions.remove_at(_ghost_positions.size() - 1)
 
 	_update_trail(delta)
-	_scan_near_misses()
 	_test_chain_collision()
+	if not is_alive:
+		return
+	_scan_near_misses()
 
 	# Off-screen miss (playfield + margin).
 	if global_position.x < -80.0 or global_position.x > 1360.0 \
@@ -133,6 +138,7 @@ func _draw() -> void:
 		]),
 		fill
 	)
+	WormColor.draw_symbol(self, Vector2(-3, 0), worm_color, 0.65, outline)
 	draw_circle(Vector2(10.0, -3.0), 3.5, highlight)
 	draw_circle(Vector2(11.0, -1.5), 2.2, Color.WHITE)
 	draw_circle(Vector2(12.0, -1.5), 1.1, Color(0.1, 0.1, 0.1))
@@ -215,26 +221,30 @@ func _test_chain_collision() -> void:
 	_on_hit(hit_worm, hit_point)
 
 
-func _segment_circle_hit(
+static func _segment_circle_hit(
 	from: Vector2,
 	to: Vector2,
 	center: Vector2,
 	radius: float
 ) -> Dictionary:
-	## Returns {t, point} for the earliest intersection, or {} on miss.
-	var ab: Vector2 = to - from
-	var length_sq: float = ab.length_squared()
+	## Exact swept-circle entry, shared with the aim preview. Closest approach
+	## is not the contact point and can reverse insertion sides or hit order.
+	var offset: Vector2 = from - center
+	var radius_sq: float = radius * radius
+	if offset.length_squared() <= radius_sq:
+		return {"t": 0.0, "point": from}
+	var travel: Vector2 = to - from
+	var length_sq: float = travel.length_squared()
 	if length_sq <= 0.0001:
-		if from.distance_squared_to(center) <= radius * radius:
-			return {"t": 0.0, "point": from}
 		return {}
-
-	var ac: Vector2 = center - from
-	var t: float = clampf(ac.dot(ab) / length_sq, 0.0, 1.0)
-	var closest: Vector2 = from + ab * t
-	if closest.distance_squared_to(center) <= radius * radius:
-		return {"t": t, "point": closest}
-	return {}
+	var b: float = offset.dot(travel)
+	var discriminant: float = b * b - length_sq * (offset.length_squared() - radius_sq)
+	if discriminant < 0.0:
+		return {}
+	var t: float = (-b - sqrt(discriminant)) / length_sq
+	if t < 0.0 or t > 1.0:
+		return {}
+	return {"t": t, "point": from + travel * t}
 
 
 func _on_hit(hit_worm: Worm, hit_point: Vector2) -> void:

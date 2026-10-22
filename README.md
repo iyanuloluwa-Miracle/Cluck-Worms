@@ -2,7 +2,7 @@
 
 A Zuma-style 2D puzzle game: a cartoon chicken at the center of the yard fires colored worms into a chain that crawls along a path toward the nest. Match three or more to pop them, set up chain reactions, and beat a boss at the end of every stage.
 
-Built and tested with **Godot 4.7.2** (GL Compatibility renderer, 1280×720 base viewport with `canvas_items` stretch / `expand` aspect). The web export is single-threaded so it runs on itch.io, Poki, CrazyGames and mobile browsers without cross-origin isolation headers.
+Built and tested with **Godot 4.7.2** (GL Compatibility renderer, 1280×720 base viewport with `canvas_items` stretch / `keep` aspect). The web export is single-threaded so it runs on itch.io, Poki, CrazyGames and mobile browsers without cross-origin isolation headers.
 
 ---
 
@@ -12,6 +12,16 @@ Built and tested with **Godot 4.7.2** (GL Compatibility renderer, 1280×720 base
 - Web export templates (`Editor → Manage Export Templates`) for HTML5 builds
 
 ---
+
+## Arcade upgrade (October 2026)
+
+The latest changes add first-contact collision, consistent touch aiming, live field training,
+current/next ammo with shape cues, a garden art pass, cached scenery and worm artwork, mode-preserving
+retry, fair final-shot resolution, and safer save retries.
+
+See [the implementation report](docs/ARCADE_UPGRADE_REPORT.md) and open
+[the before/after visual review](docs/visual-review.html). The existing 15-level campaign,
+three bosses, separate music/SFX volume controls, and saves remain in place.
 
 ## How to run
 
@@ -95,7 +105,7 @@ $env:GODOT = "C:\path\to\Godot_v4.7.2-stable_win64_console.exe"
 .\tools\run_tests.ps1
 ```
 
-This imports the project, then runs:
+This imports the project, then runs eight suites and saves full logs in docs/test-results/:
 
 | Suite | Covers |
 | --- | --- |
@@ -104,6 +114,8 @@ This imports the project, then runs:
 | `tests/GameFlowTestRunner.tscn` | Full loop: level start/complete/fail, unlocks, all 3 bosses, campaign finale, keyboard focus, composed music |
 | `tests/SmokeTestRunner.tscn` | Instantiates every scene |
 | `tests/run_meta_tests.gd` | Achievements, stats, daily / practice rules |
+| `tests/GuideTestRunner.tscn` | Live tutorial, ammo HUD, replay, save retry |
+| `tests/ArcadeSessionTestRunner.tscn` | Full first-level wins through real projectiles at desktop and phone framing |
 | `tests/bench_music.gd` | Music loudness, determinism, render timing |
 
 Visual capture harness (needs the windowed Godot build, not `--headless`):

@@ -69,7 +69,7 @@ func shake_for_combo(combo: int, match_count: int) -> void:
 
 
 func hit_stop(duration: float = 0.055) -> void:
-	if not QualitySettings.enable_hit_stop or _hit_stopping:
+	if not QualitySettings.enable_hit_stop or SaveService.reduced_fx or _hit_stopping:
 		return
 	_hit_stopping = true
 	var prev_scale: float = Engine.time_scale
@@ -80,6 +80,8 @@ func hit_stop(duration: float = 0.055) -> void:
 
 
 func pull_camera_toward(world_pos: Vector2, weight: float = 1.0) -> void:
+	if SaveService.reduced_shake:
+		return
 	_look_target = _look_target.lerp(world_pos, clampf(weight * camera_action_pull, 0.0, 1.0))
 
 
@@ -147,6 +149,9 @@ func clear_camera() -> void:
 func _update_camera(delta: float) -> void:
 	if _camera == null or not is_instance_valid(_camera):
 		return
+	if SaveService.reduced_shake:
+		_look_target = _camera_home
+		_camera.global_position = _camera_home
 	_look_target = _look_target.lerp(_camera_home, 1.0 - exp(-1.8 * delta))
 	var desired: Vector2 = _camera_home.lerp(_look_target, 0.35)
 	_camera.global_position = _camera.global_position.lerp(desired, 1.0 - exp(-camera_follow_rate * delta))
@@ -154,10 +159,10 @@ func _update_camera(delta: float) -> void:
 
 
 func _shake_offset() -> Vector2:
-	if not QualitySettings.enable_camera_shake or _trauma <= 0.001:
+	if not QualitySettings.enable_camera_shake or SaveService.reduced_shake or _trauma <= 0.001:
 		return Vector2.ZERO
 	var shake_power: float = _trauma * _trauma
-	var rng := GameManager.get_rng()
+	var rng := GameManager.get_fx_rng()
 	var cap: float = max_shake_offset * (0.65 if QualitySettings.is_low() else 1.0)
 	return Vector2(
 		rng.randf_range(-1.0, 1.0),

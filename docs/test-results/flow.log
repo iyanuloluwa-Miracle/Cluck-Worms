@@ -1,0 +1,128 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+--- Running Cluck & Worms Game Flow Tests ---
+  OK  level 1 starts
+  OK  state is PLAYING
+  OK  exactly one level instance
+  OK  chicken fires a projectile
+  OK  projectile hits the chain exactly once
+  OK  shot counted once
+  OK  hit inserted or matched
+  OK  pause sets PAUSED + tree pause
+  OK  chain frozen while paused
+  OK  projectiles frozen while paused
+  OK  resume restores play
+  OK  old level freed on retry
+  OK  retry leaves exactly one level
+  OK  retry resets shot counter
+  OK  rapid retries never duplicate the level
+  OK  chain clear completes level
+  OK  level 2 unlocked
+  OK  stars recorded
+  OK  unlock survives a reload from disk
+  OK  next level loads
+  OK  level 4 is locked
+Godot_v4.7.2-stable_win64_console.exe : WARNING: GameManager: level 11 is locked.
+At C:\Users\Iyanu\OneDrive\Desktop\Cluck & Worms\tools\run_tests.ps1:31 char:15
++ ...   $output = & $Godot --headless --path $projectRoot @suiteArgs 2>&1 | ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: GameMa...l 11 is locked.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] start_run (res://autoload/GameManager.gd:298)
+       [1] _test_locked_level_refused (res://tests/game_flow_tests.gd:199)
+       [2] _ready (res://tests/game_flow_tests.gd:29)
+       [3] _test_level_clear_unlocks_and_persists (res://tests/game_flow_tests.gd:194)
+       [4] _wait (res://tests/game_flow_tests.gd:69)
+  OK  start_run refuses a locked level
+  OK  refused start leaves current level alone
+  OK  corrupt unlock falls back to a valid value
+  OK  negative high score rejected
+  OK  bad records become an empty dictionary
+  OK  versionless save detected as legacy
+  OK  legacy unlock clamped to campaign size
+  OK  star count clamped to 3
+  OK  boss level starts when unlocked
+  OK  boss controller active
+  OK  boss health bar visible
+  OK  boss ignores damage during its intro
+  OK  intro finished, boss vulnerable
+  OK  chain released after intro
+  OK  a match damages the vulnerable boss
+  OK  direct shot strikes the boss body
+  OK  boss telegraphs an attack
+  OK  telegraphing Guardian is shielded
+  OK  post-attack weak window multiplies damage
+  OK  boss can be defeated
+  OK  boss went through every phase
+  OK  each phase transition fired once
+  OK  defeat pops the remaining chain
+  OK  stage completes only after the defeat sequence
+  OK  boss defeat completes the stage
+  OK  stage 2 unlocked
+  OK  next stage begins
+  OK  losing all lives ends the run
+  OK  menu state
+  OK  returning to menu unloads the level
+  OK  menu is not paused
+  OK  stage 2 boss is the Worm Queen
+  OK  Queen starts the fight shelled
+  OK  crest color exists on the chain
+  OK  off-color match is blocked by the shell
+  OK  crest-color match shatters the shell and deals damage
+  OK  stage 3 boss is the Golden Rooster
+  OK  egg barrage lays golden eggs
+  OK  shooting an egg smashes it
+  OK  smashing an egg chips the boss
+  OK  remaining eggs hatch on their timer
+  OK  hatched eggs add worms to the chain
+  OK  final boss completes the last stage
+  OK  finale shows the campaign complete screen
+  OK  finale has a single exit button
+  OK  finale button has keyboard focus
+  OK  finale returns to the menu
+  OK  menu focuses Adventure for keyboard play
+  OK  level 1 starts for best-score check
+  OK  gameplay releases GUI focus (Space stays swap)
+  OK  first clear reports level score and no previous best
+  OK  replay compares against the earlier best
+  OK  retry rolls back points earned during the failed attempt
+  OK  practice retry keeps its mode, level and save isolation
+  OK  restarted practice retains unlimited spawning
+  OK  daily retry keeps the daily challenge selection
+  OK  gauntlet retry preserves gauntlet mode
+  OK  practice can finish through the normal game-over flow
+  OK  practice game over cannot overwrite the competitive high score
+  OK  SCORE replenishes an empty chain while the goal is unmet
+  OK  SCORE replacement wave actually enters the playfield
+  OK  COMBO replenishes an empty chain while the goal is unmet
+  OK  COMBO replacement wave actually enters the playfield
+  OK  an earlier level's peak cannot satisfy the new combo objective
+  OK  earning the combo in the current level completes its objective
+  OK  SURVIVE replenishes an empty chain while the goal is unmet
+  OK  SURVIVE replacement wave actually enters the playfield
+  OK  browser focus loss pauses the current game
+  OK  focus-paused game resumes through the normal pause control
+  OK  the final permitted shot launches
+  OK  shot budget blocks an extra shot even with cooldown ready
+  OK  exhausting the shot budget does not kill a projectile in flight
+  OK  last shot reaches a real chain insertion
+  OK  shot-budget judgment waits for the pending match
+  OK  the final permitted shot can match and win the level
+  OK  the final permitted shot launches
+  OK  shot budget blocks an extra shot even with cooldown ready
+  OK  exhausting the shot budget does not kill a projectile in flight
+  OK  last shot reaches a real chain insertion
+  OK  shot-budget judgment waits for the pending match
+  OK  an unscored final shot costs one life only after resolution and retries cleanly
+  OK  real shot sound variations leave the gameplay RNG unchanged
+  OK  real particle generation leaves the next worm sequence unchanged
+  OK  random worm fall drift does not affect gameplay randomness
+  OK  blink and idle animation scheduling cannot alter future shot colors
+  OK  the exercised effects consumed their separate cosmetic RNG
+  OK  composed stage music replaced every fallback drone
+  OK  boss track is a long seamless loop
+Cluck & Worms game flow tests: ALL PASSED
+

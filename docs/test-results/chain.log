@@ -1,0 +1,74 @@
+﻿Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+--- Running Cluck & Worms Chain Behavior Tests ---
+  OK  insert adds exactly one worm
+  OK  3-match removes the run
+  OK  match awards score
+  OK  shot resolves as scored
+  OK  pair of 2 does not match
+  OK  non-matching shot resolves unscored
+  OK  no gap after a miss
+  OK  middle match removed
+  OK  gap remains when edge colors differ
+  OK  no reversal when edge colors differ
+  OK  cut-off front segment stands still
+  OK  rear segment catches up and rejoins
+  OK  rejoined front is pushed forward again
+  OK  middle match removed before reverse
+  OK  front segment enters reverse
+  OK  phase reports REVERSING
+  OK  leader moves backward (real reverse)
+  OK  chain_reversing emitted once
+  OK  gap closed by reverse
+  OK  reverse ends at contact
+  OK  rejoined spacing is exact
+  OK  reverse join triggers cascade match
+  OK  cascade depth 0 then 1
+  OK  after cascade, mismatched edges leave a gap
+  OK  match at chain head
+  OK  head match leaves no gap to reverse
+  OK  remaining worms do not jump
+  OK  match at chain tail
+  OK  insert lands between the two hit neighbors
+  OK  front shifts one slot forward
+  OK  rear does not move on insert
+  OK  two quick shots both insert
+  OK  both pending matches resolve
+  OK  each shot resolves exactly once
+  OK  no duplicated worms
+  OK  setup: reversing
+  OK  insert into a reversing segment rides along and rejoins
+  OK  reverse still closes the gap after the insert
+  OK  setup: gap open
+  OK  new tail matching the gap triggers reverse
+  OK  join of 2 greens does not pop
+  OK  gap closed
+  OK  rainbow completes a 3-match
+  OK  setup: insert pushes leader past the end
+  OK  no loss while the saving match resolves
+  OK  saving match removed the head
+  OK  leader reaching the end emits chain_reached_end once
+  OK  worm still in tunnel is hidden from shots
+  OK  tunnel worm is not drawn
+  OK  clearing the last worms emits chain_cleared
+  OK  fuzz: 6 trials x 900 steps keep spacing, indices and counts valid
+  OK  sweep returns first surface contact, not the worm center
+  OK  sweep starting inside a target reports immediate contact
+  OK  rear-facing impact inserts behind the worm even during a long frame
+  OK  overlapping targets choose the first contacted surface, not the closest center
+  OK  a high-speed shot passes through a real gap to the far chain
+  OK  aim guide includes muzzle offset and uses actual projectile contact
+  OK  click fires at the current pointer, even after an immediate 180-degree turn
+  OK  menu touch that creates the launcher cannot also fire a shot
+  OK  touch aim stays in place after lifting the finger
+  OK  single tap on the chicken swaps the loadout immediately
+  OK  touch release over a UI control cannot leave a held finger
+  OK  scaled and translated touch coordinates resolve to the correct world target
+  OK  pausing releases fingers before resume
+  OK  browser focus loss releases touch state
+  OK  disabling controls releases held touch fingers
+  OK  rainbow seed looks through adjacent wildcards to both real colors
+  OK  cascade setup opens a matching gap
+  OK  rear-driven gap closure preserves the earned cascade depth
+Cluck & Worms chain tests: ALL PASSED
+
