@@ -139,6 +139,15 @@ func apply_mix(master: float, sfx: float, music: float, mute: bool) -> void:
 	_set_bus_linear(SFX_BUS, sfx, SFX_BASE_DB, false)
 
 
+## Browsers can suspend Web Audio while the menu track begins. Restart it after
+## the shell confirms that a user gesture resumed the audio context.
+func resume_after_web_unlock() -> void:
+	if _current_music == &"" or _music_player.stream == null:
+		return
+	if DisplayServer.get_name() != "headless":
+		_music_player.play()
+
+
 func _set_bus_linear(bus_name: StringName, linear: float, base_db: float, force_mute: bool) -> void:
 	var idx: int = AudioServer.get_bus_index(bus_name)
 	if idx < 0:

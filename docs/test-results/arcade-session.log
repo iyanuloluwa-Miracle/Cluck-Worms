@@ -6,7 +6,7 @@
   OK  desktop: framing preserves the arena aspect ratio
   OK  desktop: full track fits inside logical viewport including worm radius
   OK  desktop: screen aiming round-trips through the active camera transform
-  SESSION desktop simulated=31.80s wall=31.92s shots=69 hits=62 matches=29 swaps=20 removed=90 score=11410 lives=3 state=3
+  SESSION desktop simulated=29.48s wall=29.59s shots=55 hits=52 matches=25 swaps=22 removed=80 score=11560 lives=3 state=3
   OK  desktop: completes the first level using actual aimed projectiles
   OK  desktop: completes without losing a life
   OK  desktop: shots produce real collisions and matches
@@ -19,7 +19,7 @@
   OK  phone_landscape: framing preserves the arena aspect ratio
   OK  phone_landscape: full track fits inside logical viewport including worm radius
   OK  phone_landscape: screen aiming round-trips through the active camera transform
-  SESSION phone_landscape simulated=31.53s wall=31.58s shots=62 hits=55 matches=26 swaps=21 removed=83 score=10441 lives=3 state=3
+  SESSION phone_landscape simulated=28.52s wall=28.57s shots=52 hits=45 matches=23 swaps=19 removed=73 score=9547 lives=3 state=3
   OK  phone_landscape: completes the first level using actual aimed projectiles
   OK  phone_landscape: completes without losing a life
   OK  phone_landscape: shots produce real collisions and matches

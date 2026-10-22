@@ -11,7 +11,7 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
  fs.mkdirSync(output, {recursive: true});
  const mobile = scenario === 'mobile';
  const viewport = mobile ? {width:844,height:390} : {width:1280,height:720};
- const browser = await chromium.launch({headless:true, ...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
+ const browser = await chromium.launch({headless:true, args:['--autoplay-policy=user-gesture-required'], ...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
  const context = await browser.newContext({viewport, hasTouch:mobile, isMobile:mobile});
  if (process.env.PROFILE_BROWSER) await context.addInitScript(()=>{
   const original=WebGL2RenderingContext.prototype.getParameter;
@@ -38,6 +38,7 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
  };
  try {
   await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+  await page.waitForTimeout(250); await snap('00-web-loader');
   await page.waitForFunction(()=>!document.getElementById('status'),{},{timeout:240000});
   await page.waitForTimeout(4500);
   await snap('01-ready');
@@ -49,6 +50,9 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
    // First play goes straight to the menu; controls are taught on the field.
    await snap('03-menu');
    await click(1090,210); await page.waitForTimeout(1000); await snap('04-selection');
+   const audioState = await page.evaluate(()=>window.CluckAudio?.status?.());
+   logs.push('Web Audio: '+JSON.stringify(audioState));
+   if (!audioState?.unlocked || !audioState.contexts?.includes('running')) errors.push('Web Audio did not unlock after user input');
    await click(300,335); await page.waitForTimeout(5000); await snap('05-gameplay');
    for (const [x,y] of [[340,600],[450,600],[640,400],[620,600],[780,600],[930,580]]) {
     await click(x,y); await page.waitForTimeout(330);

@@ -40,9 +40,7 @@ body {
 	visibility: hidden;
 }
 #status-splash {
-	max-height: 100%;
-	max-width: 100%;
-	margin: auto;
+	display: none !important;
 }
 #status-splash.show-image--false {
 	display: none;
@@ -112,6 +110,8 @@ body {
 #status-progress { bottom: 22%; border: 0; border-radius: 6px; }
 #fullscreen { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); z-index: 20; border: 1px solid #a1bc8960; border-radius: 12px; color: #e8efd8; background: #142a1ee6; padding: 10px 14px; font: 600 12px system-ui; cursor: pointer; }
 #fullscreen[hidden] { display: none; }
+#sound-unlock { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); z-index: 21; border: 1px solid #ffdc7080; border-radius: 12px; color: #17271a; background: #ffdc70; padding: 10px 14px; font: 800 12px system-ui; cursor: pointer; box-shadow: 0 4px 18px #0006; }
+#sound-unlock[hidden] { display: none; }
 #orientation-hint { display: none; position: fixed; bottom: 18%; left: 8%; right: 8%; text-align: center; font: 500 14px/1.6 system-ui; color: #d3ddc8; pointer-events: none; }
 @media (orientation: portrait) and (max-width: 750px) { #orientation-hint { display: block; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
@@ -125,6 +125,7 @@ body {
 	</canvas>
 	<noscript>Your browser does not support JavaScript.</noscript>
 	<button id="fullscreen" type="button" aria-label="Enter fullscreen" hidden>Fullscreen</button>
+	<button id="sound-unlock" type="button" aria-label="Enable game sound" hidden>Tap for sound</button>
 	<div id="orientation-hint">Turn your phone sideways for a larger playfield.<br>Your game stays paused while you switch.</div>
 	<div id="status">
 		<h1 id="loading-brand">CLUCK <span>&amp; WORMS</span></h1>
@@ -139,6 +140,61 @@ body {
 	<script>
 const GODOT_CONFIG = $GODOT_CONFIG;
 const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+
+/** Track and resume the Web Audio context that Godot creates during startup. */
+const soundUnlockButton = document.getElementById("sound-unlock");
+window.CluckAudio = (() => {
+	const contexts = new Set();
+	const callbacks = [];
+	let unlocked = false;
+	let engineReady = false;
+	const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+
+	function notifyIfRunning() {
+		if (![...contexts].some((context) => context.state === "running")) return false;
+		if (!unlocked) {
+			unlocked = true;
+			callbacks.splice(0).forEach((fn) => { try { fn(); } catch (_) {} });
+		}
+		soundUnlockButton.hidden = true;
+		return true;
+	}
+
+	async function unlock() {
+		await Promise.allSettled([...contexts].map((context) => context.state === "running" ? null : context.resume()));
+		return notifyIfRunning();
+	}
+
+	function register(context) {
+		contexts.add(context);
+		context.addEventListener("statechange", notifyIfRunning);
+		if (engineReady && !notifyIfRunning()) soundUnlockButton.hidden = false;
+		return context;
+	}
+
+	if (NativeAudioContext) {
+		const WrappedAudioContext = new Proxy(NativeAudioContext, {
+			construct(target, args) { return register(Reflect.construct(target, args, target)); },
+		});
+		try { window.AudioContext = WrappedAudioContext; } catch (_) {}
+		try { if (window.webkitAudioContext) window.webkitAudioContext = WrappedAudioContext; } catch (_) {}
+	}
+
+	for (const eventName of ["pointerdown", "touchend", "keydown"]) {
+		window.addEventListener(eventName, unlock, { capture: true, passive: true });
+	}
+	soundUnlockButton.addEventListener("click", unlock);
+
+	return {
+		unlock,
+		onUnlock(fn) { if (unlocked) fn(); else callbacks.push(fn); },
+		markEngineReady() {
+			engineReady = true;
+			if (contexts.size && !notifyIfRunning()) soundUnlockButton.hidden = false;
+		},
+		status() { return { unlocked, contexts: [...contexts].map((context) => context.state) }; },
+	};
+})();
 const engine = new Engine(GODOT_CONFIG);
 
 /** Bridge used by Godot (VatarBridge.gd) and the Lagos Life / Vatar SDK. */
@@ -162,7 +218,12 @@ window.CluckVatar = {
 	mode: null,
 	_pauseCbs: [],
 	_browserPauseCbs: [],
+	_audioUnlockCbs: [],
 	onBrowserPause(fn) { this._browserPauseCbs.push(fn); },
+	onAudioUnlock(fn) {
+		this._audioUnlockCbs.push(fn);
+		window.CluckAudio.onUnlock(() => { try { fn(); } catch (_) {} });
+	},
 	_resumeCbs: [],
 	_purchaseCbs: [],
 	onPause(fn) { this._pauseCbs.push(fn); },
@@ -335,7 +396,10 @@ if (screen.orientation) screen.orientation.addEventListener("change", pauseForBr
 				setHint("Preparing…");
 			}
 		},
-	}).then(() => setStatusMode("hidden"), displayFailureNotice);
+	}).then(() => {
+		setStatusMode("hidden");
+		window.CluckAudio.markEngineReady();
+	}, displayFailureNotice);
 }());
 	</script>
 </body>
