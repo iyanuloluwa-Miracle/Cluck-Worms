@@ -148,7 +148,17 @@ window.CluckAudio = (() => {
 	const callbacks = [];
 	let unlocked = false;
 	let engineReady = false;
+	let musicSource = null;
+	let musicBuffer = null;
+	let musicRequest = null;
+	let masterLevel = 1;
+	let musicLevel = 0.7;
+	let sfxLevel = 1;
+	let muted = false;
 	const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+	let webContext = null;
+	let musicGain = null;
+	let sfxGain = null;
 
 	function notifyIfRunning() {
 		if (![...contexts].some((context) => context.state === "running")) return false;
@@ -178,6 +188,69 @@ window.CluckAudio = (() => {
 		});
 		try { window.AudioContext = WrappedAudioContext; } catch (_) {}
 		try { if (window.webkitAudioContext) window.webkitAudioContext = WrappedAudioContext; } catch (_) {}
+		webContext = new WrappedAudioContext({ latencyHint: "interactive" });
+		musicGain = webContext.createGain();
+		sfxGain = webContext.createGain();
+		musicGain.connect(webContext.destination);
+		sfxGain.connect(webContext.destination);
+	}
+
+	function updateMix() {
+		if (!webContext) return;
+		const now = webContext.currentTime;
+		const master = muted ? 0 : masterLevel;
+		musicGain.gain.setTargetAtTime(master * musicLevel * 0.72, now, 0.025);
+		sfxGain.gain.setTargetAtTime(master * sfxLevel * 0.82, now, 0.015);
+	}
+
+	async function loadMusic() {
+		if (musicBuffer) return musicBuffer;
+		if (!musicRequest) musicRequest = fetch("menu_farmyard_loop.ogg", { cache: "force-cache" })
+			.then((response) => { if (!response.ok) throw new Error("music_" + response.status); return response.arrayBuffer(); })
+			.then((data) => webContext.decodeAudioData(data))
+			.then((buffer) => (musicBuffer = buffer))
+			.catch((error) => { console.error("Web music failed:", error); return null; });
+		return musicRequest;
+	}
+
+	async function playMusic() {
+		if (!webContext) return;
+		const buffer = await loadMusic();
+		if (!buffer || musicSource) return;
+		musicSource = webContext.createBufferSource();
+		musicSource.buffer = buffer;
+		musicSource.loop = true;
+		musicSource.connect(musicGain);
+		musicSource.start();
+	}
+
+	function stopMusic() {
+		if (!musicSource) return;
+		try { musicSource.stop(); } catch (_) {}
+		musicSource.disconnect();
+		musicSource = null;
+	}
+
+	function playSfx(name, pitch = 1, volumeDb = 0) {
+		if (!webContext || muted) return;
+		const frequencies = { peck: 720, shoot: 390, swap: 540, cluck: 260, impact: 180, pop: 660,
+			cascade: 820, match: 760, collapse: 130, reverse: 310, boss_warn: 150, boss_intro: 110,
+			boss_hit: 190, boss_defeat: 95, ability: 480, achievement: 880, danger: 170, win: 920,
+			happy_cluck: 440, lose: 120, sigh: 210, near_miss: 600 };
+		const duration = ["win", "achievement", "boss_defeat"].includes(name) ? 0.42 : 0.12;
+		const oscillator = webContext.createOscillator();
+		const envelope = webContext.createGain();
+		const now = webContext.currentTime;
+		oscillator.type = ["impact", "collapse", "boss_hit", "lose"].includes(name) ? "sawtooth" : "sine";
+		oscillator.frequency.setValueAtTime((frequencies[name] || 420) * Number(pitch || 1), now);
+		oscillator.frequency.exponentialRampToValueAtTime(Math.max(70, oscillator.frequency.value * 0.72), now + duration);
+		const amplitude = Math.min(0.32, 0.2 * Math.pow(10, Number(volumeDb || 0) / 20));
+		envelope.gain.setValueAtTime(amplitude, now);
+		envelope.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+		oscillator.connect(envelope);
+		envelope.connect(sfxGain);
+		oscillator.start(now);
+		oscillator.stop(now + duration);
 	}
 
 	for (const eventName of ["pointerdown", "touchend", "keydown"]) {
@@ -187,12 +260,22 @@ window.CluckAudio = (() => {
 
 	return {
 		unlock,
+		playMusic,
+		stopMusic,
+		playSfx,
+		setMix(master, sfx, music, isMuted) {
+			masterLevel = Math.max(0, Math.min(1, Number(master)));
+			sfxLevel = Math.max(0, Math.min(1, Number(sfx)));
+			musicLevel = Math.max(0, Math.min(1, Number(music)));
+			muted = Boolean(isMuted);
+			updateMix();
+		},
 		onUnlock(fn) { if (unlocked) fn(); else callbacks.push(fn); },
 		markEngineReady() {
 			engineReady = true;
 			if (contexts.size && !notifyIfRunning()) soundUnlockButton.hidden = false;
 		},
-		status() { return { unlocked, contexts: [...contexts].map((context) => context.state) }; },
+		status() { return { unlocked, contexts: [...contexts].map((context) => context.state), webMusic: Boolean(musicSource) }; },
 	};
 })();
 const engine = new Engine(GODOT_CONFIG);

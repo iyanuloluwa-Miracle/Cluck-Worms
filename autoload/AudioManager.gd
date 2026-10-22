@@ -93,6 +93,7 @@ func play_sfx(logical_name: StringName, pitch_scale: float = 1.0, volume_offset_
 	player.volume_db = volume_offset_db
 	if DisplayServer.get_name() != "headless":
 		player.play()
+	_web_play_sfx(logical_name, pitch_scale, volume_offset_db)
 
 
 func play_music(logical_name: StringName, fade_in: bool = false) -> void:
@@ -114,12 +115,14 @@ func play_music(logical_name: StringName, fade_in: bool = false) -> void:
 		_music_tween.tween_property(_music_player, "volume_db", target_db, 1.0)
 	else:
 		_music_player.volume_db = target_db
+	_web_play_music()
 
 
 func stop_music() -> void:
 	_kill_music_tween()
 	_music_player.stop()
 	_current_music = &""
+	_web_stop_music()
 
 
 func fade_out_music(duration: float = 0.45) -> void:
@@ -137,15 +140,57 @@ func apply_mix(master: float, sfx: float, music: float, mute: bool) -> void:
 	_set_bus_linear(&"Master", master, 0.0, mute)
 	_set_bus_linear(MUSIC_BUS, music, MUSIC_BASE_DB, false)
 	_set_bus_linear(SFX_BUS, sfx, SFX_BASE_DB, false)
+	_web_set_mix(master, sfx, music, mute)
 
 
 ## Browsers can suspend Web Audio while the menu track begins. Restart it after
 ## the shell confirms that a user gesture resumed the audio context.
 func resume_after_web_unlock() -> void:
+	apply_mix(
+		SaveService.master_volume,
+		SaveService.sfx_volume,
+		SaveService.music_volume,
+		SaveService.mute_all
+	)
 	if _current_music == &"" or _music_player.stream == null:
 		return
 	if DisplayServer.get_name() != "headless":
+		_music_player.stop()
 		_music_player.play()
+	_web_play_music()
+
+
+func _web_audio() -> Variant:
+	if not OS.has_feature("web"):
+		return null
+	var win: Variant = JavaScriptBridge.get_interface("window")
+	if win == null:
+		return null
+	return win.CluckAudio
+
+
+func _web_play_sfx(logical_name: StringName, pitch: float, volume_db: float) -> void:
+	var audio: Variant = _web_audio()
+	if audio != null:
+		audio.playSfx(String(logical_name), pitch, volume_db)
+
+
+func _web_play_music() -> void:
+	var audio: Variant = _web_audio()
+	if audio != null:
+		audio.playMusic()
+
+
+func _web_stop_music() -> void:
+	var audio: Variant = _web_audio()
+	if audio != null:
+		audio.stopMusic()
+
+
+func _web_set_mix(master: float, sfx: float, music: float, mute: bool) -> void:
+	var audio: Variant = _web_audio()
+	if audio != null:
+		audio.setMix(master, sfx, music, mute)
 
 
 func _set_bus_linear(bus_name: StringName, linear: float, base_db: float, force_mute: bool) -> void:

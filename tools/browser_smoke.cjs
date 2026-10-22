@@ -11,8 +11,23 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
  fs.mkdirSync(output, {recursive: true});
  const mobile = scenario === 'mobile';
  const viewport = mobile ? {width:844,height:390} : {width:1280,height:720};
- const browser = await chromium.launch({headless:true, args:['--autoplay-policy=user-gesture-required'], ...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
+ const browser = await chromium.launch({headless:true, ignoreDefaultArgs:['--mute-audio'], args:['--autoplay-policy=user-gesture-required'], ...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
  const context = await browser.newContext({viewport, hasTouch:mobile, isMobile:mobile});
+ if (process.env.PROBE_AUDIO) await context.addInitScript(()=>{
+  window.__audioProbe={analysers:[]};
+  const connect=AudioNode.prototype.connect;
+  AudioNode.prototype.connect=function(destination,...args){
+   if (destination instanceof AudioDestinationNode && !this.__cluckProbed) {
+    this.__cluckProbed=true;
+    const analyser=this.context.createAnalyser();
+    analyser.fftSize=2048;
+    window.__audioProbe.analysers.push(analyser);
+    connect.call(this,analyser);
+    return connect.call(analyser,destination,...args);
+   }
+   return connect.call(this,destination,...args);
+  };
+ });
  if (process.env.PROFILE_BROWSER) await context.addInitScript(()=>{
   const original=WebGL2RenderingContext.prototype.getParameter;
   window.__glQueries={};
@@ -53,6 +68,23 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
    const audioState = await page.evaluate(()=>window.CluckAudio?.status?.());
    logs.push('Web Audio: '+JSON.stringify(audioState));
    if (!audioState?.unlocked || !audioState.contexts?.includes('running')) errors.push('Web Audio did not unlock after user input');
+   if (process.env.PROBE_AUDIO) {
+    const audioSignal = await page.evaluate(async()=>{
+     const analysers=window.__audioProbe?.analysers || [];
+     let peak=0;
+     for(let sample=0;sample<30;sample++){
+      for(const analyser of analysers){
+       const data=new Float32Array(analyser.fftSize);
+       analyser.getFloatTimeDomainData(data);
+       for(const value of data) peak=Math.max(peak,Math.abs(value));
+      }
+      await new Promise(resolve=>setTimeout(resolve,50));
+     }
+     return {analysers:analysers.length,peak};
+    });
+    logs.push('Web Audio signal: '+JSON.stringify(audioSignal));
+    if (!audioSignal.analysers || audioSignal.peak < 0.0001) errors.push('No audible Web Audio samples reached the destination');
+   }
    await click(300,335); await page.waitForTimeout(5000); await snap('05-gameplay');
    for (const [x,y] of [[340,600],[450,600],[640,400],[620,600],[780,600],[930,580]]) {
     await click(x,y); await page.waitForTimeout(330);

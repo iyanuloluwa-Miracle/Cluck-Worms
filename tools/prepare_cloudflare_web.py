@@ -31,6 +31,7 @@ def main() -> int:
 	if OUT.exists():
 		shutil.rmtree(OUT)
 	shutil.copytree(SRC, OUT)
+	shutil.copy2(ROOT / "audio" / "music" / "menu_farmyard_loop.ogg", OUT / "menu_farmyard_loop.ogg")
 
 	wasm = OUT / "index.wasm"
 	raw = wasm.read_bytes()
