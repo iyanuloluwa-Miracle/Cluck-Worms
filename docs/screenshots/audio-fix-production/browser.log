@@ -1,0 +1,10 @@
+log: Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+log: OpenGL API OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium)) - Compatibility - Using Device: WebKit - WebKit WebGL
+log: Build configuration: Emscripten 4.0.20, single-threaded, no GDExtension support.
+Web Audio: {"unlocked":true,"contexts":["running"]}
+TaskDuration over sample: 2.684 seconds
+ScriptDuration over sample: 2.302 seconds
+LayoutDuration over sample: 0.000 seconds
+GPU: ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)
+browser RAF frame ms: median=66.6, p95=83.7
+WebGL scissor state matches driver: true
