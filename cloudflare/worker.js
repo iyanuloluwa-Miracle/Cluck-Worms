@@ -48,6 +48,17 @@ export default {
 			});
 		}
 
+		if (path === "/index.html" || path === "/index.pck") {
+			const headers = new Headers(assetResponse.headers);
+			headers.set("Cache-Control", "no-cache, must-revalidate");
+			headers.set("Content-Security-Policy", FRAME_ANCESTORS);
+			return new Response(assetResponse.body, {
+				status: assetResponse.status,
+				statusText: assetResponse.statusText,
+				headers,
+			});
+		}
+
 		return withSecurityHeaders(assetResponse);
 	},
 };

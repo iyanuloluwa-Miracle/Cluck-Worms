@@ -60,9 +60,16 @@ body {
 	bottom: 10%;
 	width: min(72%, 420px);
 	height: 8px;
-	accent-color: #f6cb5a;
 	margin: 0 auto;
+	overflow: hidden;
+	background: #071a12;
+	border: 1px solid #8eaa7640;
+	box-shadow: inset 0 1px 4px #0008;
 }
+#status-progress-fill { display: block; width: var(--load-progress, 0%); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #e9b83d, #ffdc70, #92d66d); transition: width .18s ease-out; }
+#status-progress.compiling { background: #0d2b1d; }
+#status-progress.compiling #status-progress-fill { width: 38%; box-shadow: 0 0 12px #ffdc7088; animation: compile-sweep 1.15s ease-in-out infinite; }
+@keyframes compile-sweep { 0% { transform: translateX(-115%); } 100% { transform: translateX(330%); } }
 #status-notice {
 	background-color: #5b3943;
 	border-radius: 0.5rem;
@@ -108,6 +115,8 @@ body {
 #loading-copy { font: 600 12px/1.5 system-ui, sans-serif; letter-spacing: .2em; text-transform: uppercase; color: #b8cbaa; z-index: 1; }
 #status-hint { position: relative; z-index: 1; margin-top: 30px; font-size: 13px; }
 #status-progress { bottom: 22%; border: 0; border-radius: 6px; }
+#status-retry { display: none; position: relative; z-index: 2; margin-top: 14px; border: 1px solid #ffdc7080; border-radius: 10px; color: #17271a; background: #ffdc70; padding: 9px 15px; font: 800 12px system-ui; cursor: pointer; }
+#status-retry.visible { display: block; }
 #fullscreen { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); z-index: 20; border: 1px solid #a1bc8960; border-radius: 12px; color: #e8efd8; background: #142a1ee6; padding: 10px 14px; font: 600 12px system-ui; cursor: pointer; }
 #fullscreen[hidden] { display: none; }
 #sound-unlock { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); z-index: 21; border: 1px solid #ffdc7080; border-radius: 12px; color: #17271a; background: #ffdc70; padding: 10px 14px; font: 800 12px system-ui; cursor: pointer; box-shadow: 0 4px 18px #0006; }
@@ -131,8 +140,9 @@ body {
 		<h1 id="loading-brand">CLUCK <span>&amp; WORMS</span></h1>
 		<div id="loading-copy">Small chicken. Big chain reactions.</div>
 		<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
-		<progress id="status-progress"></progress>
+		<div id="status-progress" role="progressbar" aria-label="Loading game" aria-valuemin="0" aria-valuemax="100"><span id="status-progress-fill"></span></div>
 		<div id="status-hint">Downloading…</div>
+		<button id="status-retry" type="button">Reload game</button>
 		<div id="status-notice"></div>
 	</div>
 
@@ -282,7 +292,7 @@ const engine = new Engine(GODOT_CONFIG);
 
 /** Bridge used by Godot (VatarBridge.gd) and the Lagos Life / Vatar SDK. */
 const fullscreenButton = document.getElementById("fullscreen");
-fullscreenButton.hidden = !document.fullscreenEnabled;
+fullscreenButton.hidden = true;
 fullscreenButton.addEventListener("click", async () => {
 	try {
 		if (document.fullscreenElement) await document.exitFullscreen();
@@ -381,8 +391,11 @@ if (screen.orientation) screen.orientation.addEventListener("change", pauseForBr
 	const statusProgress = document.getElementById("status-progress");
 	const statusNotice = document.getElementById("status-notice");
 	const statusHint = document.getElementById("status-hint");
+	const statusRetry = document.getElementById("status-retry");
 	let initializing = true;
 	let statusMode = "";
+	let compileTimer = 0;
+	statusRetry.addEventListener("click", () => location.reload());
 
 	function setHint(text) {
 		if (!statusHint) return;
@@ -393,8 +406,10 @@ if (screen.orientation) screen.orientation.addEventListener("change", pauseForBr
 	function setStatusMode(mode) {
 		if (statusMode === mode || !initializing) return;
 		if (mode === "hidden") {
+			clearTimeout(compileTimer);
 			statusOverlay.remove();
 			initializing = false;
+			fullscreenButton.hidden = !document.fullscreenEnabled;
 			return;
 		}
 		statusOverlay.style.visibility = "visible";
@@ -466,16 +481,26 @@ if (screen.orientation) screen.orientation.addEventListener("change", pauseForBr
 	engine.startGame({
 		onProgress(current, total) {
 			if (current > 0 && total > 0) {
-				statusProgress.value = current;
-				statusProgress.max = total;
+				const percent = Math.min(100, Math.floor((current / total) * 100));
+				statusProgress.style.setProperty("--load-progress", percent + "%");
+				statusProgress.setAttribute("aria-valuenow", String(percent));
 				if (current >= total) {
-					setHint("Compiling engine… keep this tab open (1–3 min on phones).");
+					statusProgress.classList.add("compiling");
+					statusProgress.removeAttribute("aria-valuenow");
+					statusProgress.setAttribute("aria-valuetext", "Starting game");
+					setHint("Starting the game…");
+					if (!compileTimer) compileTimer = setTimeout(() => {
+						if (!initializing) return;
+						setHint("Startup is taking longer than expected.");
+						statusRetry.classList.add("visible");
+					}, 30000);
 				} else {
-					setHint("Downloading… " + Math.min(100, Math.floor((current / total) * 100)) + "%");
+					statusProgress.classList.remove("compiling");
+					setHint("Downloading… " + percent + "%");
 				}
 			} else {
-				statusProgress.removeAttribute("value");
-				statusProgress.removeAttribute("max");
+				statusProgress.classList.add("compiling");
+				statusProgress.removeAttribute("aria-valuenow");
 				setHint("Preparing…");
 			}
 		},

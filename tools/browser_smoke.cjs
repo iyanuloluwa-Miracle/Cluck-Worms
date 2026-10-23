@@ -52,9 +52,13 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
    if(mobile) await page.touchscreen.tap(px,py); else await page.mouse.click(px,py);
  };
  try {
+  const startupBegin = Date.now();
   await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForTimeout(250); await snap('00-web-loader');
+  const loadingControlsHidden = await page.evaluate(()=>!document.getElementById('status') || document.getElementById('fullscreen')?.hidden === true);
+  if (!loadingControlsHidden) errors.push('Fullscreen control overlaps the startup loader');
   await page.waitForFunction(()=>!document.getElementById('status'),{},{timeout:240000});
+  logs.push('Startup time: '+(Date.now()-startupBegin)+' ms');
   await page.waitForTimeout(4500);
   await snap('01-ready');
   if (scenario!=='boot') {
