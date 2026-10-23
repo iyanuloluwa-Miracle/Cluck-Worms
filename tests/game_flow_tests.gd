@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_retry_cleans_up()
 	await _test_level_clear_unlocks_and_persists()
 	await _test_locked_level_refused()
+	await _test_coop_curl_requires_chain_clear()
 	await _test_corrupt_save_defaults()
 	await _test_boss_encounter()
 	await _test_game_over_and_menu()
@@ -198,6 +199,21 @@ func _test_locked_level_refused() -> void:
 	_expect(not GameManager.can_start_level(0, 3), "level 4 is locked")
 	_expect(not GameManager.start_run(2, 0), "start_run refuses a locked level")
 	_expect(GameManager.level_index == 1, "refused start leaves current level alone")
+
+
+func _test_coop_curl_requires_chain_clear() -> void:
+	SaveService.max_level_unlocked = maxi(SaveService.max_level_unlocked, 3)
+	GameManager.start_run(0, 2)
+	await _wait(0.1)
+	var coop_curl: LevelData = GameManager.current_level_def
+	_expect(coop_curl.id == &"s1_l3" and coop_curl.objective == LevelObjective.Kind.CLEAR_CHAIN, "Coop Curl requires clearing its chain")
+	GameManager.score = GameManager.level_start_score + 2500
+	GameManager.register_match(3, WormColor.Kind.RED, 0)
+	_expect(GameManager.state == GameManager.State.PLAYING and not GameManager.objective_met, "Coop Curl cannot advance at the old score threshold")
+	_clear_level()
+	_expect(GameManager.state == GameManager.State.LEVEL_COMPLETE, "Coop Curl completes only after its chain is cleared")
+	GameManager.go_to_main_menu()
+	await _wait(0.1)
 
 
 func _test_corrupt_save_defaults() -> void:
