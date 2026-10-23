@@ -117,7 +117,7 @@ body {
 #status-progress { bottom: 22%; border: 0; border-radius: 6px; }
 #status-retry { display: none; position: relative; z-index: 2; margin-top: 14px; border: 1px solid #ffdc7080; border-radius: 10px; color: #17271a; background: #ffdc70; padding: 9px 15px; font: 800 12px system-ui; cursor: pointer; }
 #status-retry.visible { display: block; }
-#fullscreen { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); z-index: 20; border: 1px solid #a1bc8960; border-radius: 12px; color: #e8efd8; background: #142a1ee6; padding: 10px 14px; font: 600 12px system-ui; cursor: pointer; }
+#fullscreen { display: none !important; position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); z-index: 20; border: 1px solid #a1bc8960; border-radius: 12px; color: #e8efd8; background: #142a1ee6; padding: 10px 14px; font: 600 12px system-ui; cursor: pointer; }
 #fullscreen[hidden] { display: none; }
 #sound-unlock { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); z-index: 21; border: 1px solid #ffdc7080; border-radius: 12px; color: #17271a; background: #ffdc70; padding: 10px 14px; font: 800 12px system-ui; cursor: pointer; box-shadow: 0 4px 18px #0006; }
 #sound-unlock[hidden] { display: none; }
@@ -409,7 +409,6 @@ if (screen.orientation) screen.orientation.addEventListener("change", pauseForBr
 			clearTimeout(compileTimer);
 			statusOverlay.remove();
 			initializing = false;
-			fullscreenButton.hidden = !document.fullscreenEnabled;
 			return;
 		}
 		statusOverlay.style.visibility = "visible";
