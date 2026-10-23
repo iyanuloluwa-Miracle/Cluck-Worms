@@ -9,7 +9,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scenario = 'boot'] = process.argv.slice(2);
 (async () => {
  fs.mkdirSync(output, {recursive: true});
- const mobile = scenario === 'mobile';
+ const mobile = scenario === 'mobile' || scenario === 'mobile-boot';
  const viewport = mobile ? {width:844,height:390} : {width:1280,height:720};
  const browser = await chromium.launch({headless:true, ignoreDefaultArgs:['--mute-audio'], args:['--autoplay-policy=user-gesture-required'], ...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
  const context = await browser.newContext({viewport, hasTouch:mobile, isMobile:mobile});
@@ -61,7 +61,7 @@ const [url = 'http://127.0.0.1:8086', output = 'docs/screenshots/browser', scena
   logs.push('Startup time: '+(Date.now()-startupBegin)+' ms');
   await page.waitForTimeout(4500);
   await snap('01-ready');
-  if (scenario!=='boot') {
+  if (scenario!=='boot' && scenario!=='mobile-boot') {
    if (scenario === 'live') {
     await click(640,367); await page.keyboard.type('Arcade QA'); await click(640,456);
     await page.waitForTimeout(1500); await click(1035,620); await page.waitForTimeout(1000);
