@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _wait(0.2)
 
 	await _test_start_and_shoot()
+	_test_campaign_objective_configuration()
 	await _test_pause_freezes_gameplay()
 	await _test_retry_cleans_up()
 	await _test_level_clear_unlocks_and_persists()
@@ -88,6 +89,32 @@ func _live_levels() -> int:
 		if not child.is_queued_for_deletion():
 			n += 1
 	return n
+
+
+func _test_campaign_objective_configuration() -> void:
+	var seen_ids: Dictionary = {}
+	var audited: int = 0
+	for stage: StageDef in GameManager.catalog.stages:
+		for level: LevelData in stage.levels:
+			audited += 1
+			_expect(not seen_ids.has(level.id), "%s has a unique campaign id" % level.display_name)
+			seen_ids[level.id] = true
+			var valid: bool = false
+			match level.objective:
+				LevelObjective.Kind.CLEAR_CHAIN:
+					valid = not level.is_boss_level and level.target_score == 0 and level.target_combo == 0 and is_zero_approx(level.survive_seconds) and level.shot_limit == 0
+				LevelObjective.Kind.SCORE_TARGET:
+					valid = not level.is_boss_level and level.target_score > 0
+				LevelObjective.Kind.COMBO_TARGET:
+					valid = not level.is_boss_level and level.target_combo > 0
+				LevelObjective.Kind.SURVIVE_TIME:
+					valid = not level.is_boss_level and level.survive_seconds > 0.0
+				LevelObjective.Kind.LIMITED_SHOTS:
+					valid = not level.is_boss_level and level.shot_limit > 0
+				LevelObjective.Kind.DEFEAT_BOSS:
+					valid = level.is_boss_level and level.boss != null
+			_expect(valid, "%s has one valid, matching completion condition" % level.display_name)
+	_expect(audited == 15, "all 15 campaign completion conditions audited")
 
 
 func _shoot_at_chain() -> bool:
@@ -212,6 +239,8 @@ func _test_coop_curl_requires_chain_clear() -> void:
 	_expect(GameManager.state == GameManager.State.PLAYING and not GameManager.objective_met, "Coop Curl cannot advance at the old score threshold")
 	_clear_level()
 	_expect(GameManager.state == GameManager.State.LEVEL_COMPLETE, "Coop Curl completes only after its chain is cleared")
+	await _wait(0.5)
+	_expect(GameManager.state == GameManager.State.LEVEL_COMPLETE and GameManager.level_index == 2, "Coop Curl waits for Next after completion")
 	GameManager.go_to_main_menu()
 	await _wait(0.1)
 
