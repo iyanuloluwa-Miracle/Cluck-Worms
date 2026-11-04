@@ -410,8 +410,12 @@ window.CluckVatar = {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ session, purchaseId }),
 		});
-		if (!r.ok) throw new Error("claim_failed_" + r.status);
-		return await r.json().catch(() => ({ ok: true }));
+		const data = await r.json().catch(() => ({}));
+		if (!r.ok) {
+			console.error("CluckVatar.claim failed", r.status, data);
+			throw new Error((data && data.error) || ("claim_failed_" + r.status));
+		}
+		return data;
 	},
 	async leaderboard() {
 		if (!this.ready || typeof Vatar === "undefined") return null;

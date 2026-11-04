@@ -3,6 +3,7 @@
  * - Serves Brotli-precompressed index.wasm under the 25 MiB upload limit
  * - Allows framing by Lagos Life / Vatar worlds
  * - Verifies IAP claims with the Vatar Games API (VATAR_SECRET)
+ * - Optional signed webhook at POST /vatar-webhook (VATAR_WEBHOOK_SECRET)
  */
 
 const VATAR_API = "https://lagoslife.app/api/games/v1";
@@ -13,12 +14,19 @@ export default {
 	async fetch(request, env) {
 		const url = new URL(request.url);
 
-		if (request.method === "OPTIONS" && url.pathname === "/claim") {
+		if (
+			request.method === "OPTIONS" &&
+			(url.pathname === "/claim" || url.pathname === "/vatar-webhook")
+		) {
 			return new Response(null, { status: 204, headers: corsHeaders(request) });
 		}
 
 		if (request.method === "POST" && url.pathname === "/claim") {
 			return handleClaim(request, env);
+		}
+
+		if (request.method === "POST" && url.pathname === "/vatar-webhook") {
+			return handleWebhook(request, env);
 		}
 
 		let path = url.pathname;
@@ -157,6 +165,50 @@ async function handleClaim(request, env) {
 		}),
 		{ status: 200, headers }
 	);
+}
+
+async function handleWebhook(request, env) {
+	const headers = {
+		...corsHeaders(request),
+		"Content-Type": "application/json",
+	};
+	const whsec = env.VATAR_WEBHOOK_SECRET;
+	if (!whsec) {
+		return new Response(JSON.stringify({ error: "server_misconfigured" }), {
+			status: 500,
+			headers,
+		});
+	}
+
+	const raw = await request.arrayBuffer();
+	const signature = request.headers.get("X-Vatar-Signature") || "";
+	if (!(await signedWebhook(raw, signature, whsec))) {
+		return new Response(JSON.stringify({ error: "bad_signature" }), {
+			status: 401,
+			headers,
+		});
+	}
+
+	// Nudge only — real grants happen via /claim after GET /purchases/{id}.
+	return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+async function signedWebhook(rawBody, header, whsec) {
+	const key = await crypto.subtle.importKey(
+		"raw",
+		new TextEncoder().encode(whsec),
+		{ name: "HMAC", hash: "SHA-256" },
+		false,
+		["sign"]
+	);
+	const mac = await crypto.subtle.sign("HMAC", key, rawBody);
+	const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+	const want = new TextEncoder().encode("sha256=" + hex);
+	const got = new TextEncoder().encode(String(header));
+	if (want.length !== got.length) return false;
+	let diff = 0;
+	for (let i = 0; i < want.length; i++) diff |= want[i] ^ got[i];
+	return diff === 0;
 }
 
 async function vatar(secret, path, body) {
