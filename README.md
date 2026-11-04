@@ -1,5 +1,9 @@
 # Cluck & Worms
 
+<p align="center">
+  <img src="docs/listing-assets/icon-512.png" alt="Cluck & Worms icon" width="160" height="160">
+</p>
+
 A Zuma-style 2D puzzle game: a cartoon chicken at the center of the yard fires colored worms into a chain that crawls along a path toward the nest. Match three or more to pop them, set up chain reactions, and beat a boss at the end of every stage.
 
 Built and tested with **Godot 4.7.2** (GL Compatibility renderer, 1280×720 base viewport with `canvas_items` stretch / `keep` aspect). The web export is single-threaded so it runs on itch.io, Poki, CrazyGames and mobile browsers without cross-origin isolation headers.
